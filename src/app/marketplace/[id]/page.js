@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc, getDoc } from 'firebase/firestore';
+import Image from 'next/image';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -35,7 +36,7 @@ function MarketplaceDetail() {
       <div className="container detail-page animate-fadeInUp">
         <Link href="/marketplace" className="btn btn-ghost" style={{ marginBottom: 'var(--space-4)' }}>← Back to Marketplace</Link>
         <div className="card-glass" style={{ padding: 'var(--space-8)', overflow: 'hidden' }}>
-          {item.imageUrl && <img src={item.imageUrl} alt={item.title} loading="lazy" decoding="async" style={{ width: '100%', maxHeight: 400, objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-6)' }} />}
+          {item.imageUrl && <Image src={item.imageUrl} alt={item.title} width={800} height={400} style={{ width: '100%', maxHeight: 400, objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-6)' }} />}
           <div className="detail-header">
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
               <span className="badge">{item.category}</span>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
@@ -53,7 +54,7 @@ export default function Navbar() {
               <Menu size={24} />
             </button>
             <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <img src="/logo.png" alt="ShareVIT Logo" style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
+              <Image src="/logo.png" alt="ShareVIT Logo" width={36} height={36} style={{ borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
               <span>Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
             </Link>
           </div>
@@ -111,7 +112,7 @@ export default function Navbar() {
       <div className={`mobile-nav ${mobileOpen ? 'open' : ''}`}>
         <div className="mobile-nav-header">
           <Link href="/" className="navbar-logo" onClick={() => setMobileOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <img src="/logo.png" alt="ShareVIT Logo" style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
+            <Image src="/logo.png" alt="ShareVIT Logo" width={36} height={36} style={{ borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
             <span>Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
           </Link>
           <button className="mobile-nav-close" onClick={() => setMobileOpen(false)}><X size={24} /></button>

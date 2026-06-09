@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -113,7 +114,7 @@ function CreateListingContent() {
           <div className="form-group">
             <label className="form-label">Image</label>
             <div className="upload-area" onClick={() => document.getElementById('listing-image').click()}>
-              {preview ? <img src={preview} alt="Preview" loading="lazy" decoding="async" style={{ maxHeight: 200, borderRadius: 'var(--radius-md)' }} /> : <><p style={{ fontSize: '2rem' }}>📷</p><p>Click to upload an image</p></>}
+              {preview ? <Image src={preview} alt="Preview" width={200} height={200} style={{ maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--radius-md)' }} unoptimized /> : <><p style={{ fontSize: '2rem' }}>📷</p><p>Click to upload an image</p></>}
               <input id="listing-image" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
             </div>
           </div>

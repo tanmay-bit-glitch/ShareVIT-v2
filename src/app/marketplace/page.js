@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -78,7 +79,7 @@ function MarketplaceContent() {
               <Link key={item.id} href={`/marketplace/${item.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="listing-card">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.title} className="listing-card-image" loading="lazy" decoding="async" />
+                    <Image src={item.imageUrl} alt={item.title} width={400} height={200} className="listing-card-image" style={{ objectFit: 'cover' }} />
                   ) : (
                     <div className="listing-card-image" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', background: 'var(--bg-tertiary)' }}>📦</div>
                   )}
