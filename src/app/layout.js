@@ -28,6 +28,8 @@ export const viewport = {
   maximumScale: 1,
 };
 
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" data-theme="dark" className={inter.variable} data-scroll-behavior="smooth">
@@ -37,6 +39,7 @@ export default function RootLayout({ children }) {
           src={`https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}`}
           strategy="beforeInteractive"
         />
+        <SpeedInsights />
       </body>
     </html>
   );
