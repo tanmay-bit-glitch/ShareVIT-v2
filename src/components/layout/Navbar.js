@@ -124,15 +124,16 @@ export default function Navbar() {
           )}
 
           <div className="navbar-right">
+            {/* Cart icon (Visible to all users) */}
+            <Link href="/cart" style={{ position: 'relative', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-md)', transition: 'color 0.2s', outline: 'none' }} title="Cart">
+              <ShoppingCart size={18} />
+              {cartCount > 0 && (
+                <span style={{ position: 'absolute', top: 0, right: 0, width: 16, height: 16, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: '#fff', border: '1.5px solid var(--bg-primary)' }}>{cartCount}</span>
+              )}
+            </Link>
+
             {isAuthenticated ? (
               <>
-                {/* Cart icon */}
-                <Link href="/cart" style={{ position: 'relative', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-md)', transition: 'color 0.2s', outline: 'none' }} title="Cart">
-                  <ShoppingCart size={18} />
-                  {cartCount > 0 && (
-                    <span style={{ position: 'absolute', top: 0, right: 0, width: 16, height: 16, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: '#fff', border: '1.5px solid var(--bg-primary)' }}>{cartCount}</span>
-                  )}
-                </Link>
                 {/* Notification Bell */}
                 <button style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-md)', position: 'relative', transition: 'all 0.2s' }} title="Notifications">
                   <Bell size={18} />
@@ -145,24 +146,24 @@ export default function Navbar() {
                   {dropdownOpen && (
                     <div className="navbar-dropdown">
                       <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-color)', marginBottom: 'var(--space-2)' }}>
-                      <p style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', fontSize: 'var(--fs-sm)' }}>
-                        {userData?.displayName || 'Student'}
-                      </p>
-                      <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-xs)', marginTop: '2px' }}>
-                        {user?.email}
-                      </p>
+                        <p style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', fontSize: 'var(--fs-sm)' }}>
+                          {userData?.displayName || 'Student'}
+                        </p>
+                        <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-xs)', marginTop: '2px' }}>
+                          {user?.email}
+                        </p>
+                      </div>
+                      <Link href="/dashboard" onClick={() => setDropdownOpen(false)}>
+                        <LayoutDashboard size={16} /> Dashboard
+                      </Link>
+                      <Link href="/profile" onClick={() => setDropdownOpen(false)}>
+                        <User size={16} /> Profile
+                      </Link>
+                      <button onClick={() => { setDropdownOpen(false); signOut(); }} style={{ color: 'var(--accent-danger)' }}>
+                        <LogOut size={16} /> Sign Out
+                      </button>
                     </div>
-                    <Link href="/dashboard" onClick={() => setDropdownOpen(false)}>
-                      <LayoutDashboard size={16} /> Dashboard
-                    </Link>
-                    <Link href="/profile" onClick={() => setDropdownOpen(false)}>
-                      <User size={16} /> Profile
-                    </Link>
-                    <button onClick={() => { setDropdownOpen(false); signOut(); }} style={{ color: 'var(--accent-danger)' }}>
-                      <LogOut size={16} /> Sign Out
-                    </button>
-                  </div>
-                )}
+                  )}
                 </div>
               </>
             ) : (
