@@ -56,7 +56,7 @@ function MarketplaceDetail() {
             <p>{item.description || 'No description provided.'}</p>
           </div>
           {item.sellerId !== user?.uid && (
-            <div style={{ marginTop: 'var(--space-8)', display: 'flex', gap: 'var(--space-3)' }}>
+            <div className="detail-actions">
               <a href={`mailto:${item.sellerEmail}?subject=Interested in: ${item.title}`} className="btn btn-primary btn-lg">📧 Contact Seller</a>
               <Link href="/chat" className="btn btn-secondary btn-lg">💬 Chat</Link>
             </div>

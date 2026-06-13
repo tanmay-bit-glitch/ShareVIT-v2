@@ -209,53 +209,26 @@ function AttendanceContent() {
                   
                   {/* Subject Name */}
                   <div style={{ flex: '1 1 200px', minWidth: '150px' }}>
-                    <input 
-                      placeholder="Subject Name" 
-                      value={s.name} 
-                      onChange={e => update(i, 'name', e.target.value)} 
-                      style={{ 
-                        border: 'none', 
-                        backgroundColor: 'transparent', 
-                        fontWeight: 'var(--fw-medium)', 
-                        fontSize: '1rem', 
-                        color: 'var(--text-primary)',
-                        padding: 0,
-                        margin: 0,
-                        outline: 'none',
-                        width: '100%'
-                      }} 
-                    />
+                    <span style={{ fontWeight: 'var(--fw-medium)', fontSize: '1rem', color: 'var(--text-primary)' }}>
+                      {s.name || 'Unnamed Subject'}
+                    </span>
                   </div>
 
-                  {/* Quick Controls */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', padding: '2px', border: '1px solid var(--border-color)' }}>
-                      <button className="btn btn-ghost" style={{ padding: '4px' }} onClick={() => update(i, 'attended', String(Math.max(0, a - 1)))}><Minus size={14} /></button>
-                      <input 
-                        type="number" 
-                        value={s.attended} 
-                        onChange={e => update(i, 'attended', e.target.value)}
-                        style={{ width: '30px', textAlign: 'center', fontWeight: 'var(--fw-medium)', background: 'transparent', border: 'none', color: 'var(--text-primary)', padding: 0, fontSize: '0.875rem', outline: 'none' }} 
-                      />
-                      <span style={{ color: 'var(--text-tertiary)' }}>/</span>
-                      <input 
-                        type="number" 
-                        value={s.total} 
-                        onChange={e => update(i, 'total', e.target.value)}
-                        style={{ width: '30px', textAlign: 'center', fontWeight: 'var(--fw-medium)', background: 'transparent', border: 'none', color: 'var(--text-primary)', padding: 0, fontSize: '0.875rem', outline: 'none' }} 
-                      />
-                      <button className="btn btn-ghost" style={{ padding: '4px' }} onClick={() => update(i, 'total', String(t + 1))}><Plus size={14} /></button>
-                    </div>
+                  {/* Classes Present / Total */}
+                  <div style={{ minWidth: '80px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    {a} / {t}
                   </div>
 
                   {/* Progress Bar & Percentage */}
                   <div style={{ flex: '2 1 150px', minWidth: '150px', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                    <div style={{ flex: 1, height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-full)', position: 'relative' }}>
                         <div style={{ 
                           width: `${Math.min(100, pct)}%`, 
                           height: '100%', 
+                          borderRadius: 'var(--radius-full)',
                           background: isAbove ? 'var(--gradient-success)' : 'var(--gradient-danger)', 
-                          transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' 
+                          transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isAbove ? '0 0 12px rgba(16, 185, 129, 0.6)' : '0 0 12px rgba(239, 68, 68, 0.6)'
                         }} />
                     </div>
                     <span style={{ fontSize: '0.875rem', fontWeight: 'var(--fw-bold)', color: 'var(--text-primary)', minWidth: '45px', textAlign: 'right' }}>{pct}%</span>
@@ -278,24 +251,8 @@ function AttendanceContent() {
                     ) : <span />}
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions (removed extra buttons, kept spacing consistent) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                    <button 
-                      className="btn btn-primary" 
-                      title="Attended class (+1 to both)" 
-                      onClick={() => { update(i, 'attended', String(a+1)); update(i, 'total', String(t+1)); }} 
-                      style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: 'var(--radius-md)', minHeight: 0 }}
-                    >
-                      +1
-                    </button>
-                    <button 
-                      className="btn btn-ghost" 
-                      title="Delete Subject"
-                      onClick={() => removeSubject(i)} 
-                      style={{ padding: '4px', color: 'var(--text-muted)' }}
-                    >
-                      <XIcon size={16} />
-                    </button>
                   </div>
 
                 </div>
@@ -307,13 +264,7 @@ function AttendanceContent() {
             No subjects added yet. Add a subject or upload your timetable.
           </div>
         )}
-        
-        <div style={{ padding: 'var(--space-3)', borderTop: subjects.length > 0 ? '1px solid var(--border-color)' : 'none', display: 'flex', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <button className="btn btn-ghost" onClick={addSubject} style={{ color: 'var(--accent-primary)', fontWeight: 'var(--fw-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <Plus size={16} /> Add Subject
-          </button>
-        </div>
-      </div>
+        {/* Add Subject area removed */}
 
     </div></div>
   );

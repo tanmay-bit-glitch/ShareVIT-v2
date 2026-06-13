@@ -57,7 +57,7 @@ function NoteDetail() {
           </div>
         </div>
         {item.description && <div className="detail-body"><h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--text-primary)' }}>Description</h3><p>{item.description}</p></div>}
-        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-6)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="download-box">
           <div><p style={{ fontWeight: 'var(--fw-semibold)' }}>📎 {item.fileName}</p><p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-sm)' }}>{item.fileSize ? `${(item.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}</p></div>
           <button className="btn btn-primary btn-lg" onClick={handleDownload}>⬇ Download</button>
         </div>

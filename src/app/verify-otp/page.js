@@ -37,6 +37,9 @@ export default function VerifyOTPPage() {
 
   const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const newOtp = [...otp];
+      newOtp[index - 1] = '';
+      setOtp(newOtp);
       inputRefs.current[index - 1]?.focus();
     }
   };
@@ -107,6 +110,8 @@ export default function VerifyOTPPage() {
                 ref={el => inputRefs.current[i] = el}
                 className="otp-input"
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 maxLength={1}
                 value={digit}
                 onChange={e => handleChange(i, e.target.value)}
