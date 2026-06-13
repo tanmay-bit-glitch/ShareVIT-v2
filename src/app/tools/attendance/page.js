@@ -265,6 +265,7 @@ function AttendanceContent() {
           </div>
         )}
         {/* Add Subject area removed */}
+      </div>
 
     </div></div>
   );
