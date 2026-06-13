@@ -4,6 +4,7 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit 
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { MessagesSquare, Send } from 'lucide-react';
 
 export default function ChatPage() { return <ProtectedRoute><ChatContent /></ProtectedRoute>; }
 
@@ -13,6 +14,7 @@ function ChatContent() {
   const [sending, setSending] = useState(false);
   const { user, userData } = useAuth();
   const bottomRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const q = query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc'), limit(200));
@@ -22,7 +24,13 @@ function ChatContent() {
     return () => unsub();
   }, []);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      setTimeout(() => {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [messages]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -41,27 +49,171 @@ function ChatContent() {
   };
 
   return (
-    <div className="page-content" style={{ padding: 'var(--space-4) 0' }}>
-      <div className="container">
-        <div className="chat-container card-glass" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <div style={{ padding: 'var(--space-4) var(--space-6)', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
-            <h2 style={{ fontSize: 'var(--fs-lg)' }}>💬 Student Chat</h2>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-xs)' }}>Chat with fellow VIT students in real-time</p>
-          </div>
-          <div className="chat-messages">
-            {messages.length === 0 && <div className="empty-state" style={{ padding: 'var(--space-8)' }}><p>No messages yet. Start the conversation! 👋</p></div>}
-            {messages.map(msg => (
-              <div key={msg.id} className={`chat-bubble ${msg.senderId === user?.uid ? 'chat-bubble-sent' : 'chat-bubble-received'}`}>
-                {msg.senderId !== user?.uid && <p style={{ fontWeight: 'var(--fw-semibold)', fontSize: 'var(--fs-xs)', color: 'var(--accent-primary)', marginBottom: '2px' }}>{msg.senderName}</p>}
-                <p>{msg.text}</p>
-                <p style={{ fontSize: '10px', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>{msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}</p>
+    <div className="page-content" style={{ padding: 'var(--space-6)', height: 'calc(100vh - var(--navbar-height))', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0b0f19' }}>
+      
+      {/* Main Container */}
+      <div style={{
+        width: '100%',
+        maxWidth: '900px',
+        background: '#111827',
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '85vh',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+      }}>
+        
+        {/* Header */}
+        <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+              <div style={{ 
+                padding: '6px', 
+                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', 
+                borderRadius: '8px', 
+                display: 'flex',
+              }}>
+                <MessagesSquare size={18} color="white" />
               </div>
-            ))}
-            <div ref={bottomRef} />
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>Student Chat</h2>
+            </div>
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginTop: '6px' }}>Chat with fellow VIT students in real-time</p>
           </div>
-          <form onSubmit={handleSend} className="chat-input-bar">
-            <input placeholder="Type a message..." value={input} onChange={e => setInput(e.target.value)} />
-            <button type="submit" className="btn btn-primary" disabled={sending || !input.trim()}>Send</button>
+        </div>
+        
+        {/* Messages */}
+        <div className="chat-messages" style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
+          {messages.length === 0 && <div className="empty-state" style={{ padding: '32px', color: '#94a3b8' }}><p>No messages yet. Start the conversation! 👋</p></div>}
+          {messages.map((msg, index) => {
+            const isUser = msg.senderId === user?.uid;
+            
+            // Generate a consistent color based on sender name
+            const getAvatarColor = (name) => {
+              const colors = ['#f43f5e', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
+              let hash = 0;
+              for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+              return colors[Math.abs(hash) % colors.length];
+            };
+            const senderName = msg.senderName || 'Anonymous';
+            const avatarColor = getAvatarColor(senderName);
+            const initial = senderName.charAt(0).toUpperCase();
+
+            return (
+              <div key={msg.id} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: '16px', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                
+                {/* Avatar */}
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#fff',
+                  flexShrink: 0,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                  background: isUser ? '#6366f1' : avatarColor
+                }}>
+                  {initial}
+                </div>
+
+                {/* Message Content Wrapper */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                  
+                  {/* Sender Name (External) */}
+                  {!isUser && (
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#94a3b8', marginBottom: '6px', marginLeft: '4px' }}>
+                      {senderName}
+                    </span>
+                  )}
+                  
+                  {/* Bubble */}
+                  <div style={{
+                    padding: '16px 20px',
+                    borderRadius: '16px',
+                    fontSize: '15px',
+                    background: isUser ? '#6366f1' : '#1e293b',
+                    border: isUser ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                    color: '#f8fafc',
+                    overflowWrap: 'break-word',
+                    minWidth: '80px'
+                  }}>
+                    <p style={{ lineHeight: '1.6' }}>{msg.text}</p>
+                    <p style={{ 
+                      fontSize: '11px', 
+                      color: isUser ? 'rgba(255,255,255,0.8)' : '#94a3b8', 
+                      marginTop: '8px', 
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
+                      {isUser && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} style={{ height: '1px' }} />
+        </div>
+
+        {/* Input Bar */}
+        <div style={{ padding: '24px 32px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <form onSubmit={handleSend} style={{ display: 'flex', gap: '16px' }}>
+            <input
+              placeholder="Type a message..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              disabled={sending}
+              style={{
+                flex: 1,
+                background: '#0b0f19',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '24px',
+                padding: '16px 24px',
+                color: '#f8fafc',
+                outline: 'none',
+                fontSize: '15px',
+                transition: 'all 0.3s ease'
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = '#6366f1';
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = 'rgba(255,255,255,0.1)';
+              }}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              style={{
+                background: '#6366f1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '24px',
+                padding: '0 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: (sending || !input.trim()) ? 'not-allowed' : 'pointer',
+                opacity: (sending || !input.trim()) ? 0.6 : 1,
+                fontWeight: '500'
+              }}
+            >
+              {sending ? '...' : (
+                <>
+                  <span>Send</span>
+                  <Send size={18} strokeWidth={2} />
+                </>
+              )}
+            </button>
           </form>
         </div>
       </div>

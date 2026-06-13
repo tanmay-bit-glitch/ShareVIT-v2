@@ -18,8 +18,7 @@ export async function POST(request) {
   try {
     const { message, history } = await request.json();
     if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });//ignore
 
     const chatHistory = (history || []).map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
