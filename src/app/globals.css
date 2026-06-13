@@ -1073,3 +1073,159 @@ tr:hover td {
     justify-content: center;
   }
 }
+
+/* ============================================================
+   PATCH: Hide reCAPTCHA badge widget (auth still works via API)
+   ============================================================ */
+.grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ============================================================
+   PATCH: Fix navbar button focus/active blue outline states
+   ============================================================ */
+.navbar a:focus,
+.navbar a:focus-visible,
+.navbar button:focus,
+.navbar button:focus-visible,
+.navbar-links a:focus,
+.navbar-links a:focus-visible,
+.navbar-hamburger:focus,
+.navbar-hamburger:focus-visible,
+.navbar-avatar:focus,
+.navbar-avatar:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+/* Only show focus ring on keyboard navigation (not mouse click) */
+.navbar a:focus-visible,
+.navbar button:focus-visible {
+  outline: 2px solid rgba(99,102,241,0.5);
+  outline-offset: 2px;
+}
+/* Remove default browser blue highlight on mobile tap */
+.navbar a,
+.navbar button,
+.navbar-links a,
+.filter-btn,
+.btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   PATCH: OTP inputs — mobile optimized
+   ============================================================ */
+.otp-inputs {
+  display: flex;
+  gap: clamp(6px, 2vw, 12px);
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+.otp-input {
+  width: clamp(40px, 12vw, 56px);
+  height: clamp(48px, 14vw, 64px);
+  text-align: center;
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
+  font-weight: var(--fw-bold);
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  caret-color: var(--accent-primary);
+  /* Better mobile keyboard */
+  -webkit-text-fill-color: var(--text-primary);
+}
+.otp-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+}
+
+/* ============================================================
+   PATCH: Auth card — mobile improvements
+   ============================================================ */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 1.5rem 1.25rem;
+    border-radius: var(--radius-lg);
+  }
+  .auth-page {
+    padding: 0.75rem;
+    align-items: flex-start;
+    padding-top: calc(var(--navbar-height) + 1.5rem);
+  }
+  /* Step 2 grid collapse on small phones */
+  .auth-card .grid-2-cols {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ============================================================
+   PATCH: Dashboard — responsive fixes
+   ============================================================ */
+@media (max-width: 900px) {
+  /* The 2-column main+sidebar layout collapses to single column */
+  .dashboard-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ============================================================
+   PATCH: Marketplace item detail actions — mobile
+   ============================================================ */
+@media (max-width: 600px) {
+  .detail-actions {
+    flex-direction: column;
+  }
+  .detail-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ============================================================
+   PATCH: Footer — mobile responsive
+   ============================================================ */
+@media (max-width: 640px) {
+  .footer-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem;
+  }
+  .footer-bottom {
+    text-align: left;
+  }
+}
+
+/* ============================================================
+   PATCH: General mobile touch & spacing improvements
+   ============================================================ */
+@media (max-width: 768px) {
+  .container { padding: 0 1rem; }
+  .page-content { padding: 1.5rem 0 3rem; }
+  .hero {
+    padding-top: calc(var(--navbar-height) + 4rem);
+    padding-bottom: 3rem;
+  }
+  /* Larger tap targets on mobile */
+  .btn { min-height: 44px; }
+  .filter-btn { min-height: 36px; padding: 6px 14px; }
+  .form-input, .form-select, .form-textarea {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    min-height: 44px;
+  }
+  /* Page header smaller on mobile */
+  .page-header h1 { font-size: 1.5rem; }
+  /* Grid cols collapse */
+  .grid-3 { grid-template-columns: 1fr; }
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+  /* Prevent horizontal overflow */
+  .card-glass { overflow-wrap: break-word; }
+  /* Better mobile search */
+  .search-bar input { font-size: 16px; }
+}
+@media (max-width: 480px) {
+  .grid-4 { grid-template-columns: 1fr; }
+}

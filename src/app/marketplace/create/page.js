@@ -10,7 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-const categories = ['Books', 'Electronics', 'Lab Equipment', 'Stationery', 'Sports', 'Furniture', 'Clothing', 'Other'];
+import { MARKETPLACE_CATEGORIES } from '@/lib/constants';
+
 const listingTypes = ['Sell', 'Rent', 'Donate', 'Exchange'];
 const conditions = ['Like New', 'Good', 'Fair', 'Used'];
 
@@ -19,7 +20,7 @@ export default function CreateListingPage() {
 }
 
 function CreateListingContent() {
-  const [form, setForm] = useState({ title: '', description: '', category: '', listingType: 'Sell', price: '', condition: 'Good', location: '' });
+  const [form, setForm] = useState({ title: '', description: '', category: '', listingType: 'Sell', price: '', condition: 'Good', location: '', contactPhone: '' });
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -53,6 +54,8 @@ function CreateListingContent() {
         sellerId: user.uid,
         sellerName: userData?.displayName || 'Anonymous',
         sellerEmail: user.email,
+        // contactPhone stored but only shown if seller provides it (no sharePhone check here — listing-level override)
+        contactPhone: form.contactPhone || '',
         status: 'active',
         views: 0,
         createdAt: serverTimestamp(),
@@ -89,7 +92,7 @@ function CreateListingContent() {
               <label className="form-label">Category *</label>
               <select className="form-select" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
                 <option value="">Select category</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                {MARKETPLACE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -110,6 +113,11 @@ function CreateListingContent() {
                 {conditions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contact Phone <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>(optional — shown to buyers on this listing)</span></label>
+            <input className="form-input" type="tel" placeholder="e.g. 9876543210" inputMode="tel" value={form.contactPhone} onChange={e => setForm(p => ({ ...p, contactPhone: e.target.value }))} />
+            <p className="form-hint">This number will be visible to interested buyers on your listing page only.</p>
           </div>
           <div className="form-group">
             <label className="form-label">Image</label>

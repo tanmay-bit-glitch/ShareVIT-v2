@@ -8,7 +8,9 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-const categories = ['All', 'Books', 'Electronics', 'Lab Equipment', 'Stationery', 'Sports', 'Furniture', 'Clothing', 'Other'];
+import { MARKETPLACE_CATEGORIES } from '@/lib/constants';
+
+const categories = ['All', ...MARKETPLACE_CATEGORIES];
 const listingTypes = ['All Types', 'Sell', 'Rent', 'Donate', 'Exchange'];
 
 export default function MarketplacePage() {

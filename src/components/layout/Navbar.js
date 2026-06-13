@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 import { ShoppingCart, BookOpen, FileText, ClipboardList, Bot, MessageSquare, Wrench, Menu, X, User, LogOut, Bell, LayoutDashboard } from 'lucide-react';
+import { useCart } from '@/context/CartContext';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -21,6 +22,7 @@ const navLinks = [
 
 export default function Navbar() {
   const { user, userData, signOut, isAuthenticated } = useAuth();
+  const { count: cartCount } = useCart();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -76,6 +78,13 @@ export default function Navbar() {
           <div className="navbar-right">
             {isAuthenticated ? (
               <>
+                {/* Cart icon */}
+                <Link href="/cart" style={{ position: 'relative', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-md)', transition: 'color 0.2s', outline: 'none' }} title="Cart">
+                  <ShoppingCart size={18} />
+                  {cartCount > 0 && (
+                    <span style={{ position: 'absolute', top: 0, right: 0, width: 16, height: 16, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: '#fff', border: '1.5px solid var(--bg-primary)' }}>{cartCount}</span>
+                  )}
+                </Link>
                 {/* Notification Bell */}
                 <button style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-md)', position: 'relative', transition: 'all 0.2s' }} title="Notifications">
                   <Bell size={18} />
