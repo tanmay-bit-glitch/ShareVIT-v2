@@ -6,9 +6,10 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
-import { ShoppingCart, BookOpen, FileText, ClipboardList, Bot, MessageSquare, Wrench, Menu, X, User, LogOut } from 'lucide-react';
+import { ShoppingCart, BookOpen, FileText, ClipboardList, Bot, MessageSquare, Wrench, Menu, X, User, LogOut, Bell, LayoutDashboard } from 'lucide-react';
 
 const navLinks = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/marketplace', label: 'Marketplace', icon: ShoppingCart },
   { href: '/notes', label: 'Notes & PYQs', icon: BookOpen },
   { href: '/assignments', label: 'Assignments', icon: FileText },
@@ -74,13 +75,19 @@ export default function Navbar() {
 
           <div className="navbar-right">
             {isAuthenticated ? (
-              <div style={{ position: 'relative' }} ref={dropdownRef}>
-                <div className="navbar-avatar" onClick={() => setDropdownOpen(!dropdownOpen)}>
-                  {getInitials(userData?.displayName)}
-                </div>
-                {dropdownOpen && (
-                  <div className="navbar-dropdown">
-                    <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-color)', marginBottom: 'var(--space-2)' }}>
+              <>
+                {/* Notification Bell */}
+                <button style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-md)', position: 'relative', transition: 'all 0.2s' }} title="Notifications">
+                  <Bell size={18} />
+                  <span style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', background: '#ef4444', border: '1.5px solid var(--bg-primary)' }} />
+                </button>
+                <div style={{ position: 'relative' }} ref={dropdownRef}>
+                  <div className="navbar-avatar" onClick={() => setDropdownOpen(!dropdownOpen)}>
+                    {getInitials(userData?.displayName)}
+                  </div>
+                  {dropdownOpen && (
+                    <div className="navbar-dropdown">
+                      <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-color)', marginBottom: 'var(--space-2)' }}>
                       <p style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', fontSize: 'var(--fs-sm)' }}>
                         {userData?.displayName || 'Student'}
                       </p>
@@ -88,6 +95,9 @@ export default function Navbar() {
                         {user?.email}
                       </p>
                     </div>
+                    <Link href="/dashboard" onClick={() => setDropdownOpen(false)}>
+                      <LayoutDashboard size={16} /> Dashboard
+                    </Link>
                     <Link href="/profile" onClick={() => setDropdownOpen(false)}>
                       <User size={16} /> Profile
                     </Link>
@@ -96,7 +106,8 @@ export default function Navbar() {
                     </button>
                   </div>
                 )}
-              </div>
+                </div>
+              </>
             ) : (
               <div className="flex-row gap-3">
                 <Link href="/login" className="btn btn-ghost">Log In</Link>

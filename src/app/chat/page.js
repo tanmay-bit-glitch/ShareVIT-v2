@@ -4,11 +4,21 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit 
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { MessagesSquare, Send } from 'lucide-react';
+import { MessagesSquare, Send, Hash } from 'lucide-react';
+
+const ROOMS = [
+  { id: 'general',     label: 'General',     emoji: '💬', col: 'chatMessages',            desc: 'All students' },
+  { id: 'cse',         label: 'CSE',         emoji: '💻', col: 'chatMessages_cse',        desc: 'Comp Science' },
+  { id: 'entc',        label: 'ENTC',        emoji: '📡', col: 'chatMessages_entc',       desc: 'Electronics' },
+  { id: 'mechanical',  label: 'Mechanical',  emoji: '⚙️', col: 'chatMessages_mech',       desc: 'Mechanical' },
+  { id: 'civil',       label: 'Civil',       emoji: '🏗️', col: 'chatMessages_civil',      desc: 'Civil Engg' },
+  { id: 'marketplace', label: 'Marketplace', emoji: '🛒', col: 'chatMessages_market',     desc: 'Buy/Sell help' },
+];
 
 export default function ChatPage() { return <ProtectedRoute><ChatContent /></ProtectedRoute>; }
 
 function ChatContent() {
+  const [room, setRoom] = useState(ROOMS[0]);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -17,12 +27,13 @@ function ChatContent() {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'chatMessages'), orderBy('createdAt', 'asc'), limit(200));
+    setMessages([]);
+    const q = query(collection(db, room.col), orderBy('createdAt', 'asc'), limit(200));
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, []);
+  }, [room]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -37,7 +48,7 @@ function ChatContent() {
     if (!input.trim() || sending) return;
     setSending(true);
     try {
-      await addDoc(collection(db, 'chatMessages'), {
+      await addDoc(collection(db, room.col), {
         text: input.trim(),
         senderId: user.uid,
         senderName: userData?.displayName || 'Anonymous',
@@ -65,21 +76,43 @@ function ChatContent() {
       }}>
         
         {/* Header */}
-        <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-              <div style={{ 
-                padding: '6px', 
-                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', 
-                borderRadius: '8px', 
-                display: 'flex',
-              }}>
-                <MessagesSquare size={18} color="white" />
-              </div>
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff' }}>Student Chat</h2>
+        <div style={{ padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+            <div style={{ padding: '6px', background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', borderRadius: '8px', display: 'flex' }}>
+              <MessagesSquare size={18} color="white" />
             </div>
-            <p style={{ color: '#94a3b8', fontSize: '13px', marginTop: '6px' }}>Chat with fellow VIT students in real-time</p>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>
+                {room.emoji} #{room.label}
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: '12px' }}>{room.desc} — Community Chat</p>
+            </div>
+          </div>
+          {/* Room selector tabs */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {ROOMS.map(r => (
+              <button
+                key={r.id}
+                onClick={() => setRoom(r)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: '20px',
+                  border: `1px solid ${r.id === room.id ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                  background: r.id === room.id ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  color: r.id === room.id ? '#818cf8' : '#94a3b8',
+                  fontSize: '12px',
+                  fontWeight: r.id === room.id ? '600' : '400',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                }}
+              >
+                <span>{r.emoji}</span> {r.label}
+              </button>
+            ))}
           </div>
         </div>
         
