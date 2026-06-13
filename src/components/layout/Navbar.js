@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
-import { ShoppingCart, BookOpen, FileText, ClipboardList, Bot, MessageSquare, Wrench, Menu, X, User, LogOut, Bell, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, BookOpen, FileText, ClipboardList, Bot, MessageSquare, Wrench, Menu, X, User, LogOut, Bell, LayoutDashboard, ChevronDown, MoreHorizontal } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 
 const navLinks = [
@@ -20,27 +20,48 @@ const navLinks = [
   { href: '/tools', label: 'Tools', icon: Wrench },
 ];
 
+const visibleLinks = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/marketplace', label: 'Marketplace', icon: ShoppingCart },
+  { href: '/notes', label: 'Notes & PYQs', icon: BookOpen },
+  { href: '/ai-assistant', label: 'AI Assistant', icon: Bot },
+  { href: '/chat', label: 'Chat', icon: MessageSquare },
+];
+
+const dropdownLinks = [
+  { href: '/assignments', label: 'Assignments', icon: FileText },
+  { href: '/requests', label: 'Requests', icon: ClipboardList },
+  { href: '/tools', label: 'Tools', icon: Wrench },
+];
+
 export default function Navbar() {
   const { user, userData, signOut, isAuthenticated } = useAuth();
   const { count: cartCount } = useCart();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const moreDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
+      if (moreDropdownRef.current && !moreDropdownRef.current.contains(e.target)) {
+        setMoreDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close mobile nav on route change
+  // Close mobile nav & dropdowns on route change
   useEffect(() => {
     setMobileOpen(false);
+    setDropdownOpen(false);
+    setMoreDropdownOpen(false);
   }, [pathname]);
 
   const getInitials = (name) => {
@@ -58,13 +79,13 @@ export default function Navbar() {
             </button>
             <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <Image src="/logo.png" alt="ShareVIT Logo" width={36} height={36} style={{ borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
-              <span>Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
+              <span className="navbar-logo-text">Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
             </Link>
           </div>
 
           {isAuthenticated && (
             <ul className="navbar-links">
-              {navLinks.map(link => (
+              {visibleLinks.map(link => (
                 <li key={link.href}>
                   <Link href={link.href} className={pathname?.startsWith(link.href) ? 'active' : ''}>
                     <link.icon size={18} />
@@ -72,6 +93,33 @@ export default function Navbar() {
                   </Link>
                 </li>
               ))}
+              <li style={{ position: 'relative' }} ref={moreDropdownRef}>
+                <button
+                  className={`navbar-more-btn ${moreDropdownOpen ? 'active' : ''} ${dropdownLinks.some(link => pathname?.startsWith(link.href)) ? 'parent-active' : ''}`}
+                  onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
+                  aria-haspopup="true"
+                  aria-expanded={moreDropdownOpen}
+                >
+                  <MoreHorizontal size={18} />
+                  <span>More</span>
+                  <ChevronDown size={14} className="chevron" />
+                </button>
+                {moreDropdownOpen && (
+                  <div className="navbar-dropdown navbar-more-dropdown">
+                    {dropdownLinks.map(link => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={pathname?.startsWith(link.href) ? 'active' : ''}
+                        onClick={() => setMoreDropdownOpen(false)}
+                      >
+                        <link.icon size={16} />
+                        <span>{link.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </li>
             </ul>
           )}
 
