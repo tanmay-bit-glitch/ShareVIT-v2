@@ -26,21 +26,20 @@ export async function POST(request) {
   try {
     const { message, history, mode } = await request.json();
     if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
     const systemPrompt = MODE_PROMPTS[mode] || DEFAULT_SYSTEM_PROMPT;
+
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      systemInstruction: systemPrompt 
+    });
 
     const chatHistory = (history || []).map(msg => ({
       role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
+      parts: [{ text: msg.content || "" }],
     }));
 
     const chat = model.startChat({
-      history: [
-        { role: 'user', parts: [{ text: 'Follow these instructions: ' + systemPrompt }] },
-        { role: 'model', parts: [{ text: 'I understand. I am the ShareVIT AI Assistant operating under your chosen mode. How can I help you today?' }] },
-        ...chatHistory,
-      ],
+      history: chatHistory,
     });
 
     const result = await chat.sendMessage(message);
