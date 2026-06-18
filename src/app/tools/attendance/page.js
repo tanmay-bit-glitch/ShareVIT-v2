@@ -182,34 +182,27 @@ function AttendanceContent() {
                     />
                   </div>
 
-                  {/* Attended Stepper */}
+                  {/* Attended & Total Inputs */}
                   <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 var(--space-2)' }}>
                     <span className="text-muted" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-1)' }}>Attended</span>
-                    <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-full)', padding: '2px' }}>
-                      <button className="btn btn-ghost" style={{ width: '28px', height: '28px', padding: 0, borderRadius: '50%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => update(i, 'attended', String(Math.max(0, a - 1)))}>-</button>
-                      <input 
-                        type="number" 
-                        value={s.attended} 
-                        onChange={e => update(i, 'attended', e.target.value)}
-                        style={{ width: '36px', textAlign: 'center', fontWeight: 'var(--fw-medium)', background: 'transparent', border: 'none', color: 'var(--text-primary)', padding: 0, fontSize: '0.875rem' }} 
-                      />
-                      <button className="btn btn-ghost" style={{ width: '28px', height: '28px', padding: 0, borderRadius: '50%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => update(i, 'attended', String(a + 1))}>+</button>
-                    </div>
+                    <input 
+                      className="form-input"
+                      type="number" 
+                      value={s.attended} 
+                      onChange={e => update(i, 'attended', e.target.value)}
+                      style={{ width: '60px', textAlign: 'center', padding: 'var(--space-1)', minHeight: '32px' }} 
+                    />
                   </div>
 
-                  {/* Total Stepper */}
                   <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 var(--space-2)' }}>
                     <span className="text-muted" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-1)' }}>Total</span>
-                    <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-full)', padding: '2px' }}>
-                      <button className="btn btn-ghost" style={{ width: '28px', height: '28px', padding: 0, borderRadius: '50%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => update(i, 'total', String(Math.max(0, t - 1)))}>-</button>
-                      <input 
-                        type="number" 
-                        value={s.total} 
-                        onChange={e => update(i, 'total', e.target.value)}
-                        style={{ width: '36px', textAlign: 'center', fontWeight: 'var(--fw-medium)', background: 'transparent', border: 'none', color: 'var(--text-primary)', padding: 0, fontSize: '0.875rem' }} 
-                      />
-                      <button className="btn btn-ghost" style={{ width: '28px', height: '28px', padding: 0, borderRadius: '50%', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => update(i, 'total', String(t + 1))}>+</button>
-                    </div>
+                    <input 
+                      className="form-input"
+                      type="number" 
+                      value={s.total} 
+                      onChange={e => update(i, 'total', e.target.value)}
+                      style={{ width: '60px', textAlign: 'center', padding: 'var(--space-1)', minHeight: '32px' }} 
+                    />
                   </div>
 
                   {/* Progress Bar & Percentage */}
