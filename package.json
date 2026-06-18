@@ -9,21 +9,17 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ducanh2912/next-pwa": "^10.2.9",
     "@google/generative-ai": "^0.21.0",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "bcryptjs": "^2.4.3",
     "firebase": "^11.0.0",
     "firebase-admin": "^13.0.0",
-    "lucide-react": "^1.17.0",
-    "next": "^15.1.7",
+    "next": "15.1.0",
     "nodemailer": "^6.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.1.7"
+    "eslint-config-next": "15.1.0"
   }
 }

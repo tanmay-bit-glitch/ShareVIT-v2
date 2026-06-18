@@ -46,7 +46,7 @@ function Detail() {
           <div className="detail-meta"><span>👤 {item.uploaderName}</span><span>⬇ {item.downloads || 0}</span><span>📅 {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently'}</span></div>
         </div>
         {item.description && <div className="detail-body"><h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--text-primary)' }}>Description</h3><p>{item.description}</p></div>}
-        <div className="download-box">
+        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-6)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><p style={{ fontWeight: 'var(--fw-semibold)' }}>📎 {item.fileName}</p></div>
           <button className="btn btn-primary btn-lg" onClick={handleDownload}>⬇ Download</button>
         </div>

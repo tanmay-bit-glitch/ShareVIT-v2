@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-import { MARKETPLACE_CATEGORIES } from '@/lib/constants';
-
-const categories = ['All', ...MARKETPLACE_CATEGORIES];
+const categories = ['All', 'Books', 'Electronics', 'Lab Equipment', 'Stationery', 'Sports', 'Furniture', 'Clothing', 'Other'];
 const listingTypes = ['All Types', 'Sell', 'Rent', 'Donate', 'Exchange'];
 
 export default function MarketplacePage() {
@@ -81,7 +78,7 @@ function MarketplaceContent() {
               <Link key={item.id} href={`/marketplace/${item.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <div className="listing-card">
                   {item.imageUrl ? (
-                    <Image src={item.imageUrl} alt={item.title} width={400} height={200} className="listing-card-image" style={{ objectFit: 'cover' }} />
+                    <img src={item.imageUrl} alt={item.title} className="listing-card-image" loading="lazy" decoding="async" />
                   ) : (
                     <div className="listing-card-image" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', background: 'var(--bg-tertiary)' }}>📦</div>
                   )}

@@ -47,33 +47,23 @@ export function AuthProvider({ children }) {
     const userDocData = {
       uid: cred.user.uid,
       email: cred.user.email,
-      // Public fields
       displayName: additionalData.displayName || '',
       prn: additionalData.prn || '',
       year: additionalData.year || '',
-      branch: additionalData.branch || additionalData.department || '',
-      campus: additionalData.campus || '',
+      department: additionalData.department || '',
+      phone: additionalData.phone || '',
+      verified: false,
+      otpVerified: false,
       role: 'student',
       reputation: 0,
       uploadsCount: 0,
       downloadsCount: 0,
-      verified: false,
-      otpVerified: false,
       createdAt: serverTimestamp(),
-      // Private fields — only accessible to the owner
-      _private: {
-        phone: additionalData.phone || '',
-        sharePhone: additionalData.sharePhone || false,
-        dob: additionalData.dob || '',
-        hostelAddress: additionalData.hostelAddress || '',
-        nearbyResidence: additionalData.nearbyResidence || '',
-      },
     };
     await setDoc(doc(db, 'users', cred.user.uid), userDocData);
     setUserData(userDocData);
     return cred;
   };
-
 
   const signIn = async (email, password) => {
     return signInWithEmailAndPassword(auth, email, password);

@@ -1,6 +1,5 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Sparkles, Send, BookOpen, ClipboardList, Calendar, FileText, Briefcase, Menu, X } from 'lucide-react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function AIAssistantPage() { return <ProtectedRoute><AIContent /></ProtectedRoute>; }
@@ -108,241 +107,61 @@ const parseMarkdown = (text) => {
   });
 };
 
-const Typewriter = ({ text, onComplete, scrollRef }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  
-  useEffect(() => {
-    let i = 0;
-    const speed = 10;
-    const timer = setInterval(() => {
-      setDisplayedText(text.substring(0, i));
-      i += 3;
-      if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: 'auto', block: 'end' });
-      if (i > text.length + 3) {
-        clearInterval(timer);
-        if (onComplete) onComplete();
-      }
-    }, speed);
-    return () => clearInterval(timer);
-  }, [text, onComplete, scrollRef]);
-
-  return <>{parseMarkdown(displayedText)}</>;
-};
-
-const MODES = [
-  { id: 'explain', label: 'Concept Explainer', desc: 'Explains complex academic engineering concepts and code.', icon: BookOpen, emoji: '📖', intro: "Hi! I'm in Concept Explainer mode. Send me any engineering concept, formula, or code block and I'll explain it clearly step-by-step." },
-  { id: 'solve', label: 'PYQ Solver', desc: 'Solves Previous Year Questions and numericals with full derivations.', icon: ClipboardList, emoji: '✏️', intro: "Hi! I'm in PYQ Solver mode. Paste any question or exam numerical, and I'll solve it step-by-step showing all formulas used." },
-  { id: 'plan', label: 'Study Planner', desc: 'Generates custom study schedules and test prep strategies.', icon: Calendar, emoji: '📅', intro: "Hi! I'm in Study Planner mode. Let me know what exam you're preparing for and how many days you have, and I'll build you a schedule." },
-  { id: 'resume', label: 'Resume Reviewer', desc: 'Reviews resume text and provides tips for placement portfolios.', icon: FileText, emoji: '📄', intro: "Hi! I'm in Resume Reviewer mode. Paste any resume section, project description, or bullet point, and I'll help you improve it for tech placement selectors." },
-  { id: 'interview', label: 'Mock Interviewer', desc: 'Simulates a mock technical interview one question at a time.', icon: Briefcase, emoji: '💼', intro: "Hi! I'm in Mock Interviewer mode. Let me know what role or topics you want to practice, and I'll start asking you questions like a real interviewer!" },
-];
-
-const SUGGESTED_PROMPTS = {
-  explain: [
-    "Explain Dijkstra's Algorithm in simple terms.",
-    "How does a Fourier Transform work in ENTC?",
-    "Derive the bending stress formula in beams."
-  ],
-  solve: [
-    "Solve: If matrix A is orthogonal, prove det(A) = ±1.",
-    "Find the Laplace Transform of t^2 * sin(at).",
-    "How to solve a Context-Free Grammar normalization question?"
-  ],
-  plan: [
-    "Create a 7-day study plan for CSE Data Structures MSE.",
-    "Divide my time to study for Mechanical Thermodynamics ESE.",
-    "Suggest a timeline for a final year capstone project."
-  ],
-  resume: [
-    "Review my DSA project bullet for my resume.",
-    "Improve my web dev internship details to sound more impactful.",
-    "List top resume writing tips for VIT Pune placements."
-  ],
-  interview: [
-    "Start a technical mock interview for software dev role.",
-    "Test me on DBMS and Operating System fundamentals.",
-    "Ask me system design questions for a scaling chat app."
-  ]
-};
-
 function AIContent() {
-  const [activeMode, setActiveMode] = useState(MODES[0]);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "Hi! I'm the ShareVIT AI Assistant 🤖 powered by Gemini 3.5. I can help you with:\n\n• Explaining academic concepts\n• Exam preparation tips\n• Solving problems step-by-step\n• VIT Pune specific queries\n\nHow can I help you today?" }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const messagesEndRef = useRef(null);
+  const bottomRef = useRef(null);
 
-  useEffect(() => {
-    setMessages([{ role: 'assistant', content: activeMode.intro, typing: false }]);
-  }, [activeMode]);
-
-  useEffect(() => { 
-    if (messagesEndRef.current && !loading) {
-      setTimeout(() => {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    }
-  }, [messages, loading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMsg, typing: false }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setLoading(true);
     try {
       const res = await fetch('/api/ai-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, history: messages, mode: activeMode.id }),
+        body: JSON.stringify({ message: userMsg, history: messages }),
       });
       const data = await res.json();
       if (res.ok) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response, typing: true }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: '❌ Sorry, I encountered an error. Please try again.', typing: false }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: '❌ Sorry, I encountered an error. Please try again.' }]);
       }
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: '❌ Connection error. Please check your internet.', typing: false }]);
-    } finally { setLoading(false); }
-  };
-
-  const handleSuggestionClick = async (promptText) => {
-    if (loading) return;
-    setMessages(prev => [...prev, { role: 'user', content: promptText, typing: false }]);
-    setLoading(true);
-    try {
-      const res = await fetch('/api/ai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: promptText, history: messages, mode: activeMode.id }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.response, typing: true }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: '❌ Sorry, I encountered an error. Please try again.', typing: false }]);
-      }
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: '❌ Connection error. Please check your internet.', typing: false }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '❌ Connection error. Please check your internet.' }]);
     } finally { setLoading(false); }
   };
 
   return (
-    <div className="page-content" style={{ padding: 'var(--space-6)', height: 'calc(100vh - var(--navbar-height))', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0b0f19' }}>
-      
-      {/* Main Grid Wrapper */}
-      <div style={{
-        width: '100%',
-        maxWidth: '1200px',
-        display: 'flex',
-        gap: '24px',
-        height: '85vh',
-        position: 'relative'
-      }}>
-        
-        {/* Left Sidebar Mode Selector */}
-        <div className={`ai-sidebar ${sidebarOpen ? 'open' : ''}`} style={{
-          width: '280px',
-          background: '#111827',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '24px 16px',
-          gap: '16px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          transition: 'transform 0.3s ease-in-out',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={16} style={{ color: 'var(--accent-primary)' }} />
-              <span>Select Assistant Mode</span>
-            </h3>
-            <button className="hide-tablet-up" onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
-              <X size={20} />
-            </button>
-          </div>
+    <div className="page-content" style={{ padding: 'var(--space-6) 0 var(--space-12)' }}>
+      <div className="container" style={{ maxWidth: '900px' }}>
+        <div className="chat-container card-glass" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden', height: 'calc(100vh - 12rem)', display: 'flex', flexDirection: 'column' }}>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: 1, scrollbarWidth: 'none' }}>
-            {MODES.map(m => {
-              const Icon = m.icon;
-              const isActive = activeMode.id === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    setActiveMode(m);
-                    setSidebarOpen(false);
-                  }}
-                  style={{
-                    padding: '14px',
-                    borderRadius: '16px',
-                    border: `1px solid ${isActive ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.04)'}`,
-                    background: isActive ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.01)',
-                    color: isActive ? '#fff' : 'var(--text-secondary)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    outline: 'none'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', fontSize: '13.5px' }}>
-                    <Icon size={16} style={{ color: isActive ? 'var(--accent-primary-hover)' : 'var(--text-tertiary)' }} />
-                    <span>{m.label}</span>
-                  </div>
-                  <span style={{ fontSize: '11px', color: isActive ? 'rgba(255,255,255,0.65)' : 'var(--text-tertiary)', lineHeight: '1.4' }}>{m.desc}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chat Container */}
-        <div style={{
-          flex: 1,
-          background: '#111827',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          overflow: 'hidden'
-        }}>
           {/* Header */}
-          <div style={{ padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button className="navbar-hamburger hide-tablet-up" onClick={() => setSidebarOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
-                <Menu size={20} />
-              </button>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
-              <span style={{ fontSize: '24px' }}>{activeMode.emoji}</span>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>{activeMode.label} Mode</h2>
-                <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>Personal Academic Copilot</p>
+          <div style={{ padding: 'var(--space-4) var(--space-6)', borderBottom: '1px solid var(--border-color)', background: 'rgba(30, 41, 59, 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backdropFilter: 'blur(10px)' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
+                <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)' }}>🤖 AI Academic Assistant</h2>
               </div>
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-xs)', marginTop: '2px' }}>Powered by Gemini 3.5 — Explanations, code, formulas</p>
             </div>
-            <button 
-              className="btn btn-ghost" 
-              onClick={() => setMessages([{ role: 'assistant', content: activeMode.intro, typing: false }])} 
-              style={{ borderRadius: '20px', padding: '6px 14px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)', color: '#cbd5e1', background: 'transparent', cursor: 'pointer' }}
-            >
-              Clear Chat
-            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setMessages([messages[0]])} style={{ borderRadius: 'var(--radius-full)', padding: 'var(--space-1) var(--space-4)', fontSize: 'var(--fs-xs)', border: '1px solid rgba(255,255,255,0.06)' }}>Clear Chat</button>
           </div>
 
-          {/* Messages list */}
-          <div className="chat-messages" style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
+          {/* Messages */}
+          <div className="chat-messages" style={{ flex: 1, padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)', overflowY: 'auto' }}>
             {messages.map((msg, i) => {
               const isUser = msg.role === 'user';
               return (
-                <div key={i} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: '16px', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                <div key={i} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: 'var(--space-3)', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row' }}>
                   {/* Avatar */}
                   <div style={{
                     width: '36px',
@@ -351,88 +170,35 @@ function AIContent() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '18px',
+                    fontSize: '1.2rem',
                     flexShrink: 0,
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-                    background: isUser ? '#6366f1' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)'
+                    boxShadow: isUser ? '0 0 10px rgba(99, 102, 241, 0.4)' : '0 0 10px rgba(139, 92, 246, 0.3)',
+                    background: isUser ? 'var(--gradient-primary)' : 'linear-gradient(135deg, #1e293b, #3b82f6)'
                   }}>
-                    {isUser ? '👤' : activeMode.emoji}
+                    {isUser ? '👤' : '🤖'}
                   </div>
 
                   {/* Bubble */}
-                  <div style={{
-                    padding: '16px 20px',
-                    borderRadius: '16px',
-                    fontSize: '14.5px',
+                  <div className={isUser ? 'chat-bubble-sent' : 'chat-bubble-received'} style={{
+                    padding: 'var(--space-3) var(--space-5)',
+                    borderRadius: 'var(--radius-lg)',
+                    fontSize: 'var(--fs-sm)',
                     lineHeight: '1.6',
-                    background: isUser ? '#6366f1' : '#1e293b',
+                    background: isUser ? 'var(--gradient-primary)' : 'rgba(30, 41, 59, 0.35)',
                     border: isUser ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                    color: '#f8fafc',
-                    overflowWrap: 'break-word',
-                    minWidth: '80px'
+                    color: '#fff',
+                    boxShadow: isUser ? '0 4px 12px rgba(99, 102, 241, 0.25)' : 'none',
+                    borderTopRightRadius: isUser ? 'var(--radius-sm)' : 'var(--radius-lg)',
+                    borderTopLeftRadius: isUser ? 'var(--radius-lg)' : 'var(--radius-sm)'
                   }}>
-                    {msg.typing ? (
-                      <Typewriter 
-                        text={msg.content} 
-                        scrollRef={messagesEndRef}
-                        onComplete={() => {
-                          setMessages(p => p.map((m, idx) => idx === i ? {...m, typing: false} : m));
-                        }} 
-                      />
-                    ) : (
-                      parseMarkdown(msg.content)
-                    )}
+                    {parseMarkdown(msg.content)}
                   </div>
                 </div>
               );
             })}
             
-            {/* Suggested Prompts Render */}
-            {messages.length === 1 && (
-              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: '16px', maxWidth: '85%', flexDirection: 'row', alignItems: 'flex-start' }}>
-                <div style={{ width: '36px', flexShrink: 0 }} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontWeight: 'var(--fw-semibold)', margin: '4px 0' }}>Suggested starting points:</p>
-                  {SUGGESTED_PROMPTS[activeMode.id].map((promptText, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleSuggestionClick(promptText)}
-                      style={{
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        background: 'rgba(255,255,255,0.02)',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        color: 'var(--text-secondary)',
-                        fontSize: '13px',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        outline: 'none'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)';
-                        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)';
-                        e.currentTarget.style.color = '#fff';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
-                        e.currentTarget.style.color = 'var(--text-secondary)';
-                      }}
-                    >
-                      <span>✨</span>
-                      <span>{promptText}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            
             {loading && (
-              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: '16px', maxWidth: '85%', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: 'var(--space-3)', maxWidth: '85%', alignItems: 'center' }}>
                 <div style={{
                   width: '36px',
                   height: '36px',
@@ -440,74 +206,68 @@ function AIContent() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '18px',
-                  flexShrink: 0,
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-                  background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)'
+                  background: 'linear-gradient(135deg, #1e293b, #3b82f6)',
+                  boxShadow: '0 0 10px rgba(139, 92, 246, 0.3)'
                 }}>
-                  {activeMode.emoji}
+                  🤖
                 </div>
-                <div style={{ display: 'flex', gap: '8px', padding: '14px 20px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                <div style={{ display: 'flex', gap: '4px', padding: '12px 18px', background: 'rgba(30, 41, 59, 0.35)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--radius-lg)', borderTopLeftRadius: 'var(--radius-sm)' }}>
                   <span className="spinner" style={{ width: '16px', height: '16px' }} />
-                  <span style={{ fontSize: '13.5px', color: '#94a3b8' }}>Thinking...</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', marginLeft: '8px' }}>Thinking...</span>
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} style={{ height: '1px' }} />
+            <div ref={bottomRef} />
           </div>
 
           {/* Input Bar */}
-          <div style={{ padding: '20px 32px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <form onSubmit={handleSend} style={{ display: 'flex', gap: '16px' }}>
-              <input
-                placeholder={`Ask in ${activeMode.label} Mode...`}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  background: '#0b0f19',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '24px',
-                  padding: '14px 20px',
-                  color: '#f8fafc',
-                  outline: 'none',
-                  fontSize: '14.5px',
-                  transition: 'all 0.3s ease'
-                }}
-                onFocus={e => {
-                  e.target.style.borderColor = '#6366f1';
-                }}
-                onBlur={e => {
-                  e.target.style.borderColor = 'rgba(255,255,255,0.1)';
-                }}
-              />
-              <button
-                type="submit"
-                disabled={loading || !input.trim()}
-                style={{
-                  background: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '24px',
-                  padding: '0 20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: (loading || !input.trim()) ? 'not-allowed' : 'pointer',
-                  opacity: (loading || !input.trim()) ? 0.6 : 1,
-                  fontWeight: '500'
-                }}
-              >
-                {loading ? '...' : (
-                  <>
-                    <span>Send</span>
-                    <Send size={16} strokeWidth={2} />
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
+          <form onSubmit={handleSend} className="chat-input-bar" style={{ padding: 'var(--space-4) var(--space-6)', background: 'rgba(15, 23, 41, 0.65)', backdropFilter: 'blur(10px)', borderTop: '1px solid var(--border-color)', display: 'flex', gap: 'var(--space-3)' }}>
+            <input
+              placeholder="Ask me anything academic..."
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              disabled={loading}
+              style={{
+                flex: 1,
+                background: 'rgba(15, 23, 41, 0.45)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-full)',
+                padding: 'var(--space-3) var(--space-5)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                fontSize: 'var(--fs-sm)',
+                transition: 'all 0.3s ease'
+              }}
+              onFocus={e => {
+                e.target.style.borderColor = 'var(--accent-primary)';
+                e.target.style.boxShadow = '0 0 12px rgba(99, 102, 241, 0.2)';
+              }}
+              onBlur={e => {
+                e.target.style.borderColor = 'var(--border-color)';
+                e.target.style.boxShadow = 'none';
+              }}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading || !input.trim()}
+              style={{
+                borderRadius: 'var(--radius-full)',
+                padding: 'var(--space-2) var(--space-6)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-1)',
+                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+              }}
+            >
+              {loading ? '...' : (
+                <>
+                  <span>Send</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </>
+              )}
+            </button>
+          </form>
         </div>
       </div>
     </div>

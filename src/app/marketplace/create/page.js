@@ -4,14 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import Image from 'next/image';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-import { MARKETPLACE_CATEGORIES } from '@/lib/constants';
-
+const categories = ['Books', 'Electronics', 'Lab Equipment', 'Stationery', 'Sports', 'Furniture', 'Clothing', 'Other'];
 const listingTypes = ['Sell', 'Rent', 'Donate', 'Exchange'];
 const conditions = ['Like New', 'Good', 'Fair', 'Used'];
 
@@ -20,7 +18,7 @@ export default function CreateListingPage() {
 }
 
 function CreateListingContent() {
-  const [form, setForm] = useState({ title: '', description: '', category: '', listingType: 'Sell', price: '', condition: 'Good', location: '', contactPhone: '' });
+  const [form, setForm] = useState({ title: '', description: '', category: '', listingType: 'Sell', price: '', condition: 'Good', location: '' });
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -54,8 +52,6 @@ function CreateListingContent() {
         sellerId: user.uid,
         sellerName: userData?.displayName || 'Anonymous',
         sellerEmail: user.email,
-        // contactPhone stored but only shown if seller provides it (no sharePhone check here — listing-level override)
-        contactPhone: form.contactPhone || '',
         status: 'active',
         views: 0,
         createdAt: serverTimestamp(),
@@ -92,7 +88,7 @@ function CreateListingContent() {
               <label className="form-label">Category *</label>
               <select className="form-select" value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}>
                 <option value="">Select category</option>
-                {MARKETPLACE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -115,14 +111,9 @@ function CreateListingContent() {
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Contact Phone <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>(optional — shown to buyers on this listing)</span></label>
-            <input className="form-input" type="tel" placeholder="e.g. 9876543210" inputMode="tel" value={form.contactPhone} onChange={e => setForm(p => ({ ...p, contactPhone: e.target.value }))} />
-            <p className="form-hint">This number will be visible to interested buyers on your listing page only.</p>
-          </div>
-          <div className="form-group">
             <label className="form-label">Image</label>
             <div className="upload-area" onClick={() => document.getElementById('listing-image').click()}>
-              {preview ? <Image src={preview} alt="Preview" width={200} height={200} style={{ maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--radius-md)' }} unoptimized /> : <><p style={{ fontSize: '2rem' }}>📷</p><p>Click to upload an image</p></>}
+              {preview ? <img src={preview} alt="Preview" loading="lazy" decoding="async" style={{ maxHeight: 200, borderRadius: 'var(--radius-md)' }} /> : <><p style={{ fontSize: '2rem' }}>📷</p><p>Click to upload an image</p></>}
               <input id="listing-image" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
             </div>
           </div>
