@@ -38,6 +38,11 @@ export async function POST(request) {
       parts: [{ text: msg.content || "" }],
     }));
 
+    // Gemini API requires history to start with a 'user' message
+    if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
+      chatHistory.shift();
+    }
+
     const chat = model.startChat({
       history: chatHistory,
     });
