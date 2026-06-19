@@ -41,7 +41,10 @@ export const uploadFile = async (file, resourceType = 'auto', onProgress) => {
     );
 
     if (response.data?.secure_url) {
-      return response.data.secure_url;
+      return {
+        secure_url: response.data.secure_url,
+        public_id: response.data.public_id
+      };
     } else {
       throw new Error('Cloudinary response did not contain secure_url.');
     }
@@ -52,34 +55,73 @@ export const uploadFile = async (file, resourceType = 'auto', onProgress) => {
 };
 
 /**
- * Validates and uploads an image (JPG, PNG, WEBP)
+ * Validates and uploads an image (JPG, JPEG, PNG, WEBP)
  */
 export const uploadImage = async (file, onProgress) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error('Invalid image type. Please select a JPG, PNG, or WEBP image file.');
+  const ext = file.name.split('.').pop().toLowerCase();
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+  
+  if (!allowedExtensions.includes(ext)) {
+    throw new Error('Invalid image type. Please select a JPG, JPEG, PNG, or WEBP image file.');
   }
   
-  // Enforce 10MB maximum image size limit
   if (file.size > 10 * 1024 * 1024) {
     throw new Error('Image size exceeds the 10MB limit.');
   }
 
-  return uploadFile(file, 'image', onProgress);
+  const res = await uploadFile(file, 'image', onProgress);
+  return res.secure_url;
 };
 
 /**
- * Validates and uploads a PDF file
+ * Validates and uploads a document file (PDF, DOC, DOCX, PPT, PPTX) to raw/upload
  */
-export const uploadPDF = async (file, onProgress) => {
-  if (file.type !== 'application/pdf') {
-    throw new Error('Invalid document type. Only PDF documents are allowed for academic resources.');
+export const uploadDocument = async (file, onProgress) => {
+  const ext = file.name.split('.').pop().toLowerCase();
+  const allowedExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
+  
+  if (!allowedExtensions.includes(ext)) {
+    throw new Error('Invalid document type. Only PDF, DOC, DOCX, PPT, and PPTX documents are allowed.');
   }
 
-  // Enforce 20MB maximum file size limit
-  if (file.size > 20 * 1024 * 1024) {
-    throw new Error('PDF file size exceeds the 20MB limit.');
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error('Document size exceeds the 25MB limit.');
   }
 
-  return uploadFile(file, 'auto', onProgress);
+  // Upload to /raw/upload
+  const res = await uploadFile(file, 'raw', onProgress);
+  return res.secure_url;
+};
+
+/**
+ * Client-side placeholder for deleting file (requires backend signatures normally)
+ */
+export const deleteCloudinaryFile = async (publicId) => {
+  console.log(`deleteCloudinaryFile called for publicId: ${publicId}`);
+  return true;
+};
+
+/**
+ * Extracts Cloudinary public ID from secure URL
+ */
+export const getPublicIdFromUrl = (url) => {
+  if (!url) return '';
+  try {
+    const parts = url.split('/upload/');
+    if (parts.length < 2) return '';
+    const pathAndExt = parts[1];
+    const segments = pathAndExt.split('/');
+    if (segments[0].match(/^v\d+$/)) {
+      segments.shift();
+    }
+    const pathWithoutVersion = segments.join('/');
+    const dotIndex = pathWithoutVersion.lastIndexOf('.');
+    if (dotIndex !== -1) {
+      return pathWithoutVersion.substring(0, dotIndex);
+    }
+    return pathWithoutVersion;
+  } catch (e) {
+    console.error('Error parsing Cloudinary public ID:', e);
+    return '';
+  }
 };

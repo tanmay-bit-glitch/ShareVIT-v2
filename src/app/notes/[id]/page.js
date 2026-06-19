@@ -28,10 +28,10 @@ function NoteDetail() {
   }, [id]);
 
   const handleDownload = async () => {
-    if (item?.fileUrl) {
+    if (item?.pdfUrl) {
       await updateDoc(doc(db, 'notes', id), { downloads: increment(1) });
       if (user) await updateDoc(doc(db, 'users', user.uid), { downloadsCount: increment(1) });
-      window.open(item.fileUrl, '_blank');
+      window.open(item.pdfUrl, '_blank');
     }
   };
 
@@ -46,20 +46,40 @@ function NoteDetail() {
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
             <span className="badge">{item.type || 'Notes'}</span>
             <span className="badge badge-info">Sem {item.semester || '?'}</span>
-            {item.department && <span className="badge badge-success">{item.department}</span>}
+            {item.branch && <span className="badge badge-success">{item.branch}</span>}
           </div>
           <h1>{item.title}</h1>
           <p style={{ fontSize: 'var(--fs-lg)', color: 'var(--accent-primary)', fontWeight: 'var(--fw-semibold)' }}>{item.subject}</p>
           <div className="detail-meta">
-            <span>👤 {item.uploaderName}</span>
+            <span>👤 {item.uploadedBy || 'Anonymous'}</span>
             <span>⬇ {item.downloads || 0} downloads</span>
             <span>📅 {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently'}</span>
           </div>
         </div>
         {item.description && <div className="detail-body"><h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--text-primary)' }}>Description</h3><p>{item.description}</p></div>}
-        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-6)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><p style={{ fontWeight: 'var(--fw-semibold)' }}>📎 {item.fileName}</p><p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-sm)' }}>{item.fileSize ? `${(item.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}</p></div>
-          <button className="btn btn-primary btn-lg" onClick={handleDownload}>⬇ Download</button>
+        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-6)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div><p style={{ fontWeight: 'var(--fw-semibold)', margin: 0 }}>📎 {item.fileName}</p><p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--fs-sm)', margin: '4px 0 0' }}>{item.fileSize ? `${(item.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown size'}</p></div>
+          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <a 
+              href={item.pdfUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={handleDownload}
+              className="btn btn-secondary btn-lg"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+            >
+              View PDF
+            </a>
+            <a 
+              href={item.pdfUrl} 
+              download
+              onClick={handleDownload}
+              className="btn btn-primary btn-lg"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', background: 'var(--gradient-primary)', color: 'white' }}
+            >
+              Download PDF
+            </a>
+          </div>
         </div>
       </div>
     </div></div>

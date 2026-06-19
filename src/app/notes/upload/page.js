@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { uploadFile } from '@/lib/cloudinary';
+import { uploadDocument } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -30,12 +30,16 @@ function UploadNotesContent() {
     if (!form.title || !form.subject || !file) return toast.error('Title, subject and file are required.');
     setLoading(true);
     try {
-      const fileUrl = await uploadFile(file, 'auto');
+      const fileUrl = await uploadDocument(file);
       await addDoc(collection(db, 'notes'), {
-        ...form, semester: form.semester || 'N/A',
-        fileUrl, fileName: file.name, fileSize: file.size,
-        uploaderId: user.uid, uploaderName: userData?.displayName || 'Anonymous',
-        downloads: 0, createdAt: serverTimestamp(),
+        title: form.title,
+        subject: form.subject,
+        branch: form.department || 'N/A',
+        semester: form.semester || 'N/A',
+        pdfUrl: fileUrl,
+        uploadedBy: userData?.displayName || 'Anonymous',
+        downloads: 0,
+        createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1), reputation: increment(5) });
       

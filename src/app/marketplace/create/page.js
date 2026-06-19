@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { uploadImage, uploadPDF } from '@/lib/cloudinary';
+import { uploadImage, uploadDocument, getPublicIdFromUrl } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -116,15 +116,23 @@ function CreateListingContent() {
   const handlePdfChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.type !== 'application/pdf') {
-        return toast.error('Please upload a PDF file.');
+      const ext = file.name.split('.').pop().toLowerCase();
+      
+      if (form.category === 'Notes' && ext !== 'pdf') {
+        return toast.error('Notes must be uploaded in PDF format.');
       }
-      if (file.size > 20 * 1024 * 1024) {
-        return toast.error('PDF file size must be less than 20MB.');
+      
+      const allowedDocExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
+      if (!allowedDocExtensions.includes(ext)) {
+        return toast.error('Invalid document format. Allowed formats: PDF, DOC, DOCX, PPT, PPTX');
+      }
+
+      if (file.size > 25 * 1024 * 1024) {
+        return toast.error('Document size must be less than 25MB.');
       }
       setPdfFile(file);
       setPdfName(file.name);
-      toast.success('PDF document loaded!');
+      toast.success('Document loaded successfully!');
     }
   };
 
@@ -195,7 +203,7 @@ function CreateListingContent() {
 
       let pdfUrl = '';
       if (pdfFile) {
-        pdfUrl = await uploadPDF(pdfFile, (progress) => {
+        pdfUrl = await uploadDocument(pdfFile, (progress) => {
           setPdfProgress(progress);
         });
       }
@@ -218,7 +226,9 @@ function CreateListingContent() {
         author: form.category === 'Books' ? form.author : '',
         // Media URLs
         imageUrl,
+        imagePublicId: image ? getPublicIdFromUrl(imageUrl) : '',
         pdfUrl,
+        pdfPublicId: pdfFile ? getPublicIdFromUrl(pdfUrl) : '',
         downloads: 0,
         // Seller details
         sellerId: user.uid,
@@ -327,10 +337,10 @@ function CreateListingContent() {
               {form.category && (
                 <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
-                  {/* Academic PDF Slot */}
+                  {/* Academic Document Slot */}
                   {isAcademicCategory() && (
                     <div className="form-group">
-                      <label className="form-label">Academic Document (PDF) *</label>
+                      <label className="form-label">Academic Document (PDF{form.category !== 'Notes' ? ', DOC, DOCX, PPT, PPTX' : ''}) *</label>
                       <div 
                         onClick={() => document.getElementById('listing-pdf').click()}
                         style={{ 
@@ -351,15 +361,23 @@ function CreateListingContent() {
                         {pdfName ? (
                           <div>
                             <p style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff', margin: 0 }}>{pdfName}</p>
-                            <p style={{ fontSize: '11px', color: 'var(--accent-success)', margin: '4px 0 0' }}>Click to replace PDF</p>
+                            <p style={{ fontSize: '11px', color: 'var(--accent-success)', margin: '4px 0 0' }}>Click to replace file</p>
                           </div>
                         ) : (
                           <>
-                            <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select PDF Document</p>
-                            <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>PDF files up to 15MB</p>
+                            <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select File</p>
+                            <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                              {form.category === 'Notes' ? 'PDF' : 'PDF, DOC, DOCX, PPT, PPTX'} up to 25MB
+                            </p>
                           </>
                         )}
-                        <input id="listing-pdf" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handlePdfChange} />
+                        <input 
+                          id="listing-pdf" 
+                          type="file" 
+                          accept={form.category === 'Notes' ? 'application/pdf' : '.pdf,.doc,.docx,.ppt,.pptx'} 
+                          style={{ display: 'none' }} 
+                          onChange={handlePdfChange} 
+                        />
                       </div>
                     </div>
                   )}

@@ -417,13 +417,27 @@ function MarketplaceDetail() {
                 {item.sellerId !== user?.uid ? (
                   <>
                     {item.pdfUrl ? (
-                      <button 
-                        onClick={handleDownloadPDF} 
-                        className="btn btn-primary btn-full btn-lg" 
-                        style={{ gap: '8px', background: 'var(--gradient-primary)' }}
-                      >
-                        <Download size={18} /> Download PDF File
-                      </button>
+                      <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                        <a 
+                          href={item.pdfUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          onClick={handleDownloadPDF}
+                          className="btn btn-secondary btn-full btn-lg" 
+                          style={{ gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', flex: 1 }}
+                        >
+                          <Eye size={18} /> View {item.pdfUrl.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Document'}
+                        </a>
+                        <a 
+                          href={item.pdfUrl} 
+                          download
+                          onClick={handleDownloadPDF}
+                          className="btn btn-primary btn-full btn-lg" 
+                          style={{ gap: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', flex: 1, background: 'var(--gradient-primary)', color: 'white' }}
+                        >
+                          <Download size={18} /> Download {item.pdfUrl.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Document'}
+                        </a>
+                      </div>
                     ) : (
                       <button 
                         onClick={handleAddToCart} 

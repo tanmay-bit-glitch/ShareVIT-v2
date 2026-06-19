@@ -177,7 +177,7 @@ function ProfileContent() {
     github: '',
     linkedin: '',
     resume: '',
-    profilePicture: '',
+    photoURL: '',
     notificationPreferences: { globalMute: false, mutedCategories: [] },
   });
 
@@ -193,7 +193,7 @@ function ProfileContent() {
         github: userData.github || '',
         linkedin: userData.linkedin || '',
         resume: userData.resume || '',
-        profilePicture: userData.profilePicture || '',
+        photoURL: userData.photoURL || '',
         notificationPreferences: userData.notificationPreferences || { globalMute: false, mutedCategories: [] },
       });
     }
@@ -212,7 +212,7 @@ function ProfileContent() {
         github: form.github,
         linkedin: form.linkedin,
         resume: form.resume,
-        profilePicture: form.profilePicture,
+        photoURL: form.photoURL,
         notificationPreferences: form.notificationPreferences,
       });
       await refreshUserData();
@@ -303,8 +303,8 @@ function ProfileContent() {
                   border: '2px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
                   overflow: 'hidden'
                 }}>
-                  {userData?.profilePicture ? (
-                    <img src={userData.profilePicture} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                  {userData?.photoURL ? (
+                    <img src={userData.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                   ) : (
                     getInitials(userData?.displayName)
                   )}
@@ -806,7 +806,7 @@ function SettingsTab({
       const url = await uploadImage(file, (progress) => {
         setProfilePicProgress(progress);
       });
-      setForm(prev => ({ ...prev, profilePicture: url }));
+      setForm(prev => ({ ...prev, photoURL: url }));
       toast.success('Profile photo uploaded! Click save to apply changes.');
     } catch (err) {
       toast.error(err.message || 'Failed to upload photo.');
@@ -832,8 +832,8 @@ function SettingsTab({
             border: '2px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
             overflow: 'hidden', flexShrink: 0
           }}>
-            {form.profilePicture ? (
-              <img src={form.profilePicture} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Preview" />
+            {form.photoURL ? (
+              <img src={form.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Preview" />
             ) : (
               '?'
             )}

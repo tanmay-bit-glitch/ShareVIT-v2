@@ -21,10 +21,10 @@ function Detail() {
   }, [id]);
 
   const handleDownload = async () => {
-    if (item?.fileUrl) {
+    if (item?.assignmentUrl) {
       await updateDoc(doc(db, 'assignments', id), { downloads: increment(1) });
       if (user) await updateDoc(doc(db, 'users', user.uid), { downloadsCount: increment(1) });
-      window.open(item.fileUrl, '_blank');
+      window.open(item.assignmentUrl, '_blank');
     }
   };
 
@@ -43,12 +43,32 @@ function Detail() {
           </div>
           <h1>{item.title}</h1>
           {item.subject && <p style={{ fontSize: 'var(--fs-lg)', color: 'var(--accent-primary)' }}>{item.subject}</p>}
-          <div className="detail-meta"><span>👤 {item.uploaderName}</span><span>⬇ {item.downloads || 0}</span><span>📅 {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently'}</span></div>
+          <div className="detail-meta"><span>👤 {item.uploadedBy || 'Anonymous'}</span><span>⬇ {item.downloads || 0}</span><span>📅 {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently'}</span></div>
         </div>
         {item.description && <div className="detail-body"><h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--text-primary)' }}>Description</h3><p>{item.description}</p></div>}
-        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-6)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><p style={{ fontWeight: 'var(--fw-semibold)' }}>📎 {item.fileName}</p></div>
-          <button className="btn btn-primary btn-lg" onClick={handleDownload}>⬇ Download</button>
+        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-6)', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div><p style={{ fontWeight: 'var(--fw-semibold)', margin: 0 }}>📎 {item.fileName}</p></div>
+          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <a 
+              href={item.assignmentUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={handleDownload}
+              className="btn btn-secondary btn-lg"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+            >
+              View Document
+            </a>
+            <a 
+              href={item.assignmentUrl} 
+              download
+              onClick={handleDownload}
+              className="btn btn-primary btn-lg"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', background: 'var(--gradient-primary)', color: 'white' }}
+            >
+              Download Document
+            </a>
+          </div>
         </div>
       </div>
     </div></div>

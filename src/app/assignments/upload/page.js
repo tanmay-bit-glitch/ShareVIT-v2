@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { uploadFile } from '@/lib/cloudinary';
+import { uploadDocument } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -26,8 +26,14 @@ function UploadContent() {
     if (!form.title || !file) return toast.error('Title and file are required.');
     setLoading(true);
     try {
-      const fileUrl = await uploadFile(file, 'auto');
-      await addDoc(collection(db, 'assignments'), { ...form, fileUrl, fileName: file.name, fileSize: file.size, uploaderId: user.uid, uploaderName: userData?.displayName || 'Anonymous', downloads: 0, createdAt: serverTimestamp() });
+      const fileUrl = await uploadDocument(file);
+      await addDoc(collection(db, 'assignments'), {
+        title: form.title,
+        subject: form.subject,
+        assignmentUrl: fileUrl,
+        uploadedBy: userData?.displayName || 'Anonymous',
+        createdAt: serverTimestamp()
+      });
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1), reputation: increment(5) });
       toast.success('Assignment uploaded! +5 reputation');
       router.push('/assignments');
