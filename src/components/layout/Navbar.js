@@ -170,14 +170,14 @@ export default function Navbar() {
       <header className="top-header" ref={navbarRef}>
         
         {/* Left: Logo Only */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
           <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center' }}>
             <img src="/logo.png" alt="ShareVIT Logo" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
           </Link>
         </div>
 
         {/* Center: Dropdown Menus (Desktop) */}
-        <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
           
           {/* Marketplace Dropdown */}
           <div className="nav-dropdown-wrapper">
@@ -263,7 +263,7 @@ export default function Navbar() {
         </div>
 
         {/* Right: Search, Notifications, Avatar, CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-4)' }}>
           
           {/* Search bar on Desktop */}
           <div className="hide-mobile" style={{ position: 'relative' }}>

@@ -37,7 +37,7 @@ function UploadContent() {
 
     setLoading(true);
     try {
-      const fileUrl = await uploadDocument(file);
+      const fileUrl = await uploadDocument(file, undefined, 'sharevit/assignments');
       await addDoc(collection(db, 'assignments'), {
         title: form.title,
         subject: form.subject,

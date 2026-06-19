@@ -209,17 +209,19 @@ function CreateListingContent() {
           throw new Error('Please attach a document.');
         }
 
+        const folderName = `sharevit/marketplace/${form.category.toLowerCase().replace(/\s+/g, '-')}`;
         pdfUrl = await uploadDocument(pdfFile, (progress) => {
           setPdfProgress(progress);
-        });
+        }, folderName);
       } else {
         if (!image) {
           throw new Error('Please upload at least one image of the product.');
         }
 
+        const folderName = `sharevit/marketplace/${form.category.toLowerCase().replace(/\s+/g, '-')}`;
         imageUrl = await uploadImage(image, (progress) => {
           setImageProgress(progress);
-        });
+        }, folderName);
       }
 
       const listingData = {
@@ -261,17 +263,16 @@ function CreateListingContent() {
       await addDoc(collection(db, 'listings'), listingData);
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1) });
       
-      // Trigger notifications
-      if (userData?.campus) {
-        await notifyGroup(
-          `New ${form.category}: ${form.title}`,
-          `${userData?.displayName || 'Someone'} shared a new post.`,
-          'Marketplace',
-          { campus: userData.campus },
-          { itemId: form.title },
-          user.uid
-        );
-      }
+      // Trigger live notification for all users (so needy persons can see it instantly)
+      await addDoc(collection(db, 'notifications'), {
+        userId: 'all',
+        title: `🆕 New ${form.category} Uploaded!`,
+        message: `${userData?.displayName || 'A seller'} just added: ${form.title}. Check if it matches any open requests!`,
+        link: `/marketplace`,
+        createdAt: serverTimestamp(),
+        read: false,
+        type: 'new_listing'
+      });
 
       toast.success('Listing published successfully!');
       const categoryRoute = form.category.toLowerCase().replace(' ', '-');

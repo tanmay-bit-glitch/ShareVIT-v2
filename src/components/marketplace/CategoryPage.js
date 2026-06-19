@@ -516,7 +516,7 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
                             <ExternalLink size={12} /> View
                           </Link>
                           
-                          {isAcademic && item.pdfUrl ? (
+                          {isAcademic && item.pdfUrl && (!item.price || item.price === 0) ? (
                             <button onClick={(e) => handleDownloadPDF(e, item)} className="btn btn-primary btn-sm" style={{ flex: 1, fontSize: '11px', padding: '6px 0', justifyContent: 'center', gap: '4px' }}>
                               <Download size={12} /> Get PDF
                             </button>

@@ -29,7 +29,7 @@ export async function POST(request) {
     const systemPrompt = MODE_PROMPTS[mode] || DEFAULT_SYSTEM_PROMPT;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-flash-latest',
       systemInstruction: systemPrompt
     });
 

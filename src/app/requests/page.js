@@ -76,6 +76,18 @@ function RequestsContent() {
         responses: 0,
         createdAt: serverTimestamp(),
       });
+
+      // Broadcast notification to all users
+      await addDoc(collection(db, 'notifications'), {
+        userId: 'all',
+        title: '📣 New Item Request',
+        message: `${userData?.displayName || 'Someone'} is looking for: ${form.title}. Do you have it?`,
+        link: '/requests',
+        createdAt: serverTimestamp(),
+        read: false,
+        type: 'request'
+      });
+
       toast.success('Request posted to the campus board!');
       setForm({ title: '', description: '', category: 'Books', urgency: 'Medium', budget: '', duration: '' });
       setModalOpen(false);

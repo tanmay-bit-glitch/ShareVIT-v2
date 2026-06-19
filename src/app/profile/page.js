@@ -805,7 +805,7 @@ function SettingsTab({
     try {
       const url = await uploadImage(file, (progress) => {
         setProfilePicProgress(progress);
-      });
+      }, 'sharevit/profiles');
       setForm(prev => ({ ...prev, photoURL: url }));
       toast.success('Profile photo uploaded! Click save to apply changes.');
     } catch (err) {

@@ -41,7 +41,7 @@ function UploadNotesContent() {
 
     setLoading(true);
     try {
-      const fileUrl = await uploadDocument(file);
+      const fileUrl = await uploadDocument(file, undefined, 'sharevit/notes');
       await addDoc(collection(db, 'notes'), {
         title: form.title,
         subject: form.subject,
@@ -54,17 +54,16 @@ function UploadNotesContent() {
       });
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1), reputation: increment(5) });
       
-      // Smart Notification Trigger
-      if (form.department) {
-        await notifyGroup(
-          `New ${form.type} Uploaded!`,
-          `${userData?.displayName || 'Someone'} uploaded "${form.title}" for ${form.subject}.`,
-          'Academic',
-          { department: form.department },
-          { itemId: form.title },
-          user.uid
-        );
-      }
+      // Trigger live notification for all users
+      await addDoc(collection(db, 'notifications'), {
+        userId: 'all',
+        title: `🆕 New ${form.type || 'Notes'} Uploaded!`,
+        message: `${userData?.displayName || 'Someone'} uploaded "${form.title}" for ${form.subject}.`,
+        link: '/notes',
+        createdAt: serverTimestamp(),
+        read: false,
+        type: 'new_note'
+      });
 
       toast.success('Notes uploaded! +5 reputation');
       router.push('/notes');

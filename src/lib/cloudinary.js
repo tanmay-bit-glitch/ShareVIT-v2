@@ -19,12 +19,15 @@ const getCloudinaryConfig = () => {
 /**
  * Base file upload handler using Axios
  */
-export const uploadFile = async (file, resourceType = 'auto', onProgress) => {
+export const uploadFile = async (file, resourceType = 'auto', onProgress, folder = 'sharevit') => {
   const { cloudName, uploadPreset } = getCloudinaryConfig();
 
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', uploadPreset);
+  if (folder) {
+    formData.append('folder', folder);
+  }
 
   try {
     const response = await axios.post(
@@ -89,21 +92,21 @@ export const validateDocument = (file) => {
 /**
  * Validates and uploads an image (JPG, JPEG, PNG, WEBP)
  */
-export const uploadImage = async (file, onProgress) => {
+export const uploadImage = async (file, onProgress, folder = 'sharevit/images') => {
   validateImage(file);
   
   if (file.size > 10 * 1024 * 1024) {
     throw new Error('Image size exceeds the 10MB limit.');
   }
 
-  const res = await uploadFile(file, 'image', onProgress);
+  const res = await uploadFile(file, 'image', onProgress, folder);
   return res.secure_url;
 };
 
 /**
  * Validates and uploads a document file (PDF, DOC, DOCX, PPT, PPTX) to raw/upload
  */
-export const uploadDocument = async (file, onProgress) => {
+export const uploadDocument = async (file, onProgress, folder = 'sharevit/documents') => {
   validateDocument(file);
 
   if (file.size > 25 * 1024 * 1024) {
@@ -111,7 +114,7 @@ export const uploadDocument = async (file, onProgress) => {
   }
 
   // Upload to /raw/upload
-  const res = await uploadFile(file, 'raw', onProgress);
+  const res = await uploadFile(file, 'raw', onProgress, folder);
   return res.secure_url;
 };
 

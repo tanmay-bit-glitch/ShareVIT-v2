@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, Suspense } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit, doc, getDoc, updateDoc, setDoc, where } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { uploadImage } from '@/lib/cloudinary';
@@ -8,17 +8,16 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useGamification } from '@/context/GamificationContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { MessagesSquare, Send, Hash, Menu, X, Image as ImageIcon, CheckCircle, ExternalLink } from 'lucide-react';
+import { MessagesSquare, Send, Hash, Menu, X, Image as ImageIcon, CheckCircle, ExternalLink, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 
-const ROOMS = [
-  { id: 'general',          label: 'general',          emoji: '💬', col: 'chatMessages',            desc: 'General announcements and student chatter' },
-  { id: 'cse',              label: 'cse',              emoji: '💻', col: 'chatMessages_cse',        desc: 'Computer Science department discussion' },
-  { id: 'entc',             label: 'entc',             emoji: '📡', col: 'chatMessages_entc',       desc: 'Electronics & Telecomm discussion' },
-  { id: 'mechanical',       label: 'mechanical',       emoji: '⚙️', col: 'chatMessages_mech',       desc: 'Mechanical engineering discussion' },
-  { id: 'civil',            label: 'civil',            emoji: '🏗️', col: 'chatMessages_civil',      desc: 'Civil engineering discussion' },
-  { id: 'placements',       label: 'placements',       emoji: '💼', col: 'chatMessages_placements', desc: 'Placement preparation, mock talks & jobs' },
-  { id: 'marketplace-help', label: 'marketplace-help', emoji: '🛒', col: 'chatMessages_market',     desc: 'Help with transactions, items & requests' },
+const PUBLIC_ROOMS = [
+  { id: 'general',          label: 'general',          emoji: '💬', col: 'chatMessages',            desc: 'General announcements and student chatter', type: 'public' },
+  { id: 'cse',              label: 'cse',              emoji: '💻', col: 'chatMessages_cse',        desc: 'Computer Science department discussion', type: 'public' },
+  { id: 'entc',             label: 'entc',             emoji: '📡', col: 'chatMessages_entc',       desc: 'Electronics & Telecomm discussion', type: 'public' },
+  { id: 'mechanical',       label: 'mechanical',       emoji: '⚙️', col: 'chatMessages_mech',       desc: 'Mechanical engineering discussion', type: 'public' },
+  { id: 'civil',            label: 'civil',            emoji: '🏗️', col: 'chatMessages_civil',      desc: 'Civil engineering discussion', type: 'public' },
+  { id: 'placements',       label: 'placements',       emoji: '💼', col: 'chatMessages_placements', desc: 'Placement preparation, mock talks & jobs', type: 'public' },
 ];
 
 export default function ChatPage() {
@@ -41,8 +40,11 @@ function ChatContent() {
   const { gainXP } = useGamification();
   const searchParams = useSearchParams();
   const itemId = searchParams.get('itemId');
+  const sellerIdParam = searchParams.get('sellerId');
+  const sellerNameParam = searchParams.get('sellerName');
 
-  const [room, setRoom] = useState(ROOMS[0]);
+  const [room, setRoom] = useState(PUBLIC_ROOMS[0]);
+  const [dmRooms, setDmRooms] = useState([]);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -54,15 +56,71 @@ function ChatContent() {
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Auto-route to marketplace-help room if itemId is present
+  // Fetch DM Rooms
   useEffect(() => {
-    if (itemId) {
-      const marketRoom = ROOMS.find(r => r.id === 'marketplace-help');
-      if (marketRoom) {
-        setRoom(marketRoom);
+    if (!user) return;
+    const q = query(
+      collection(db, 'direct_chats'),
+      where('participants', 'array-contains', user.uid),
+      orderBy('updatedAt', 'desc')
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const fetchedDms = snap.docs.map(d => {
+        const data = d.data();
+        const otherUserId = data.participants.find(id => id !== user.uid);
+        const otherUserName = data.participantNames ? data.participantNames[otherUserId] : 'User';
+        return {
+          id: d.id,
+          label: otherUserName || 'User',
+          emoji: '👤',
+          type: 'dm',
+          desc: 'Direct Message',
+          data
+        };
+      });
+      setDmRooms(fetchedDms);
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Handle auto-routing to DM from URL params
+  useEffect(() => {
+    if (!user || !sellerIdParam) return;
+    
+    // Don't DM yourself
+    if (sellerIdParam === user.uid) return;
+
+    const setupDm = async () => {
+      const chatId = user.uid < sellerIdParam ? `${user.uid}_${sellerIdParam}` : `${sellerIdParam}_${user.uid}`;
+      const chatRef = doc(db, 'direct_chats', chatId);
+      const chatSnap = await getDoc(chatRef);
+      
+      const otherName = sellerNameParam || 'Seller';
+      const myName = userData?.displayName || 'Anonymous';
+
+      if (!chatSnap.exists()) {
+        // Create new DM
+        await setDoc(chatRef, {
+          participants: [user.uid, sellerIdParam],
+          participantNames: {
+            [user.uid]: myName,
+            [sellerIdParam]: otherName
+          },
+          updatedAt: serverTimestamp(),
+          lastMessage: ''
+        });
       }
-    }
-  }, [itemId]);
+
+      setRoom({
+        id: chatId,
+        label: otherName,
+        emoji: '👤',
+        type: 'dm',
+        desc: 'Direct Message'
+      });
+    };
+    setupDm();
+  }, [user, sellerIdParam, sellerNameParam, userData]);
 
   // Fetch active item details for listing context
   useEffect(() => {
@@ -84,14 +142,23 @@ function ChatContent() {
     fetchItem();
   }, [itemId]);
 
+  // Fetch Messages based on active room
   useEffect(() => {
+    if (!room || !user) return;
     setMessages([]);
-    const q = query(collection(db, room.col), orderBy('createdAt', 'asc'), limit(200));
+    let q;
+
+    if (room.type === 'dm') {
+      q = query(collection(db, 'direct_chats', room.id, 'messages'), orderBy('createdAt', 'asc'), limit(200));
+    } else {
+      q = query(collection(db, room.col), orderBy('createdAt', 'asc'), limit(200));
+    }
+
     const unsub = onSnapshot(q, (snap) => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
-  }, [room]);
+  }, [room, user]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -101,17 +168,43 @@ function ChatContent() {
     }
   }, [messages]);
 
+  const sendMessage = async (msgText, mediaUrl = null) => {
+    if (!user) return;
+    const msgData = {
+      text: msgText,
+      senderId: user.uid,
+      senderName: userData?.displayName || 'Anonymous',
+      createdAt: serverTimestamp(),
+    };
+    if (mediaUrl) {
+      msgData.mediaUrl = mediaUrl;
+    }
+
+    if (room.type === 'dm') {
+      // Add to messages subcollection
+      await addDoc(collection(db, 'direct_chats', room.id, 'messages'), msgData);
+      
+      // Update parent document
+      let lastMsgSnippet = msgText;
+      if (!lastMsgSnippet && mediaUrl) lastMsgSnippet = '📷 Image';
+      if (lastMsgSnippet && lastMsgSnippet.length > 30) lastMsgSnippet = lastMsgSnippet.substring(0, 30) + '...';
+
+      await updateDoc(doc(db, 'direct_chats', room.id), {
+        lastMessage: lastMsgSnippet,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // Public room
+      await addDoc(collection(db, room.col), msgData);
+    }
+  };
+
   const handleSend = async (e) => {
     if (e) e.preventDefault();
     if (!input.trim() || sending) return;
     setSending(true);
     try {
-      await addDoc(collection(db, room.col), {
-        text: input.trim(),
-        senderId: user.uid,
-        senderName: userData?.displayName || 'Anonymous',
-        createdAt: serverTimestamp(),
-      });
+      await sendMessage(input.trim());
       setInput('');
     } catch (err) {
       console.error(err);
@@ -146,16 +239,9 @@ function ChatContent() {
     try {
       const downloadURL = await uploadImage(file, (progress) => {
         setChatUploadProgress(progress);
-      });
+      }, 'sharevit/chat');
 
-      await addDoc(collection(db, room.col), {
-        text: '',
-        mediaUrl: downloadURL,
-        senderId: user.uid,
-        senderName: userData?.displayName || 'Anonymous',
-        createdAt: serverTimestamp(),
-      });
-
+      await sendMessage('', downloadURL);
       toast.success('Image sent!');
     } catch (err) {
       console.error('Error uploading image:', err);
@@ -185,12 +271,23 @@ function ChatContent() {
       else if (finalStatus === 'Rented') xpAmount = 80;
       gainXP(xpAmount, `Completed transaction for: ${activeItem.title}`);
 
-      await addDoc(collection(db, room.col), {
-        text: `🎉 TRANSACTION STATUS UPDATE: "${activeItem.title}" has been marked as ${finalStatus} by the seller. Thank you for using ShareVIT!`,
-        senderId: 'system',
-        senderName: 'System',
-        createdAt: serverTimestamp(),
-      });
+      const systemMsg = `🎉 TRANSACTION STATUS UPDATE: "${activeItem.title}" has been marked as ${finalStatus} by the seller. Thank you for using ShareVIT!`;
+      
+      if (room.type === 'dm') {
+        await addDoc(collection(db, 'direct_chats', room.id, 'messages'), {
+          text: systemMsg,
+          senderId: 'system',
+          senderName: 'System',
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        await addDoc(collection(db, room.col), {
+          text: systemMsg,
+          senderId: 'system',
+          senderName: 'System',
+          createdAt: serverTimestamp(),
+        });
+      }
 
       setActiveItem(prev => ({ ...prev, status: finalStatus }));
       toast.success(`Listing marked as ${finalStatus}!`);
@@ -239,8 +336,56 @@ function ChatContent() {
           
           {/* Channels List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: 1, scrollbarWidth: 'none' }}>
+            
+            {/* Direct Messages Section */}
+            {dmRooms.length > 0 && (
+              <>
+                <p style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '8px', marginBottom: '4px' }}>Direct Messages</p>
+                {dmRooms.map(r => {
+                  const isActive = room.id === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        setRoom(r);
+                        setChannelsOpen(false);
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                        color: isActive ? '#fff' : 'var(--text-secondary)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '13.5px',
+                        outline: 'none',
+                        fontWeight: isActive ? '600' : '400',
+                        marginBottom: '4px'
+                      }}
+                    >
+                      <UserIcon size={16} style={{ color: isActive ? 'var(--accent-primary-hover)' : 'var(--text-tertiary)' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label}</span>
+                        {r.data?.lastMessage && (
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {r.data.lastMessage}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+                <div style={{ height: '12px' }} />
+              </>
+            )}
+
             <p style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '8px', marginBottom: '4px' }}>Text Channels</p>
-            {ROOMS.map(r => {
+            {PUBLIC_ROOMS.map(r => {
               const isActive = room.id === r.id;
               return (
                 <button
@@ -293,11 +438,15 @@ function ChatContent() {
             <button className="navbar-hamburger" onClick={() => setChannelsOpen(!channelsOpen)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
               <Menu size={20} />
             </button>
-            <Hash size={22} style={{ color: 'var(--accent-primary)' }} />
+            {room.type === 'dm' ? (
+              <UserIcon size={22} style={{ color: 'var(--accent-primary)' }} />
+            ) : (
+              <Hash size={22} style={{ color: 'var(--accent-primary)' }} />
+            )}
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>{room.label}</span>
-                <span style={{ fontSize: '16px' }}>{room.emoji}</span>
+                {room.type !== 'dm' && <span style={{ fontSize: '16px' }}>{room.emoji}</span>}
               </h2>
               <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '2px' }}>{room.desc}</p>
             </div>
@@ -395,7 +544,7 @@ function ChatContent() {
           <div className="chat-messages" style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
             {messages.length === 0 && (
               <div className="empty-state" style={{ padding: '32px', color: '#94a3b8', textAlign: 'center' }}>
-                <p>Welcome to #{room.label}! This is the start of the channel. 👋</p>
+                <p>{room.type === 'dm' ? `This is the beginning of your chat history with ${room.label}. Say hi! 👋` : `Welcome to #${room.label}! This is the start of the channel. 👋`}</p>
               </div>
             )}
             {messages.map((msg) => {
@@ -427,6 +576,7 @@ function ChatContent() {
               const getAvatarColor = (name) => {
                 const colors = ['#f43f5e', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
                 let hash = 0;
+                if (!name) name = 'Anonymous';
                 for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
                 return colors[Math.abs(hash) % colors.length];
               };
@@ -456,7 +606,7 @@ function ChatContent() {
 
                   {/* Message Content Wrapper */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
-                    {!isUser && (
+                    {!isUser && room.type !== 'dm' && (
                       <span style={{ fontSize: '12.5px', fontWeight: '500', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px' }}>
                         {senderName}
                       </span>
@@ -554,7 +704,7 @@ function ChatContent() {
               </button>
 
               <input
-                placeholder={uploading ? `Uploading image (${chatUploadProgress}%)...` : `Message #${room.label}`}
+                placeholder={uploading ? `Uploading image (${chatUploadProgress}%)...` : (room.type === 'dm' ? `Message ${room.label}` : `Message #${room.label}`)}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 disabled={sending || uploading}
@@ -607,4 +757,4 @@ function ChatContent() {
       </div>
     </div>
   );
-}
+}

@@ -14,6 +14,11 @@ export const metadata = {
   keywords: "ShareVIT, VIT Pune, student marketplace, notes sharing, PYQ, assignments, student resources",
 };
 
+// Force desktop view on mobile phones
+export const viewport = {
+  width: 1024,
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en" data-theme="dark" className={inter.variable} data-scroll-behavior="smooth">

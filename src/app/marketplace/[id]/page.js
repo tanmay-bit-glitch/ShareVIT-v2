@@ -416,7 +416,7 @@ function MarketplaceDetail() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {item.sellerId !== user?.uid ? (
                   <>
-                    {item.pdfUrl ? (
+                    {item.pdfUrl && (!item.price || item.price === 0) ? (
                       <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
                         <a 
                           href={item.pdfUrl} 
@@ -453,7 +453,7 @@ function MarketplaceDetail() {
                       <button onClick={handleContactSeller} className="btn btn-secondary" style={{ gap: '6px' }}>
                         <Mail size={16} /> Email Seller
                       </button>
-                      <Link href={`/chat?itemId=${item.id}`} className="btn btn-secondary" style={{ gap: '6px' }}>
+                      <Link href={`/chat?sellerId=${item.sellerId}&sellerName=${encodeURIComponent(item.sellerName || 'Seller')}&itemId=${item.id}`} className="btn btn-secondary" style={{ gap: '6px' }}>
                         <MessageSquare size={16} /> Chat Now
                       </Link>
                     </div>
