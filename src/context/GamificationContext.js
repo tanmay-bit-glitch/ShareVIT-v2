@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { createNotification } from '@/lib/notifications';
 
 const GamificationContext = createContext();
 
@@ -93,6 +94,16 @@ export function GamificationProvider({ children }) {
         reason,
         createdAt: serverTimestamp()
       });
+
+      if (leveledUp) {
+        await createNotification(
+          user.uid,
+          `🎉 Level ${nextLvl} Reached`,
+          `You are now ${LEVEL_TITLES[nextLvl]}.`,
+          'Community',
+          { link: '/profile?tab=achievements', type: 'level_up' }
+        );
+      }
       
       // Trigger toast
       const toastId = Date.now() + Math.random();
@@ -137,6 +148,14 @@ export function GamificationProvider({ children }) {
       
       // Gain XP
       await gainXP(ach.xp, `Achievement: ${ach.title}`);
+
+      await createNotification(
+        user.uid,
+        `${ach.badge} Achievement Unlocked`,
+        `${ach.title}: ${ach.desc} (+${ach.xp} XP)`,
+        'Community',
+        { link: '/profile?tab=achievements', achievementId: id, type: 'achievement' }
+      );
       
       // Display achievement notification popup
       toast.success(`🏆 Achievement Unlocked: ${ach.title} (+${ach.xp} XP)`);

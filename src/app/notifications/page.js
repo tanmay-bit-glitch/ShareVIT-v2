@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { NOTIFICATION_CATEGORIES } from '@/lib/notifications';
@@ -26,6 +27,7 @@ export default function NotificationsPage() {
 
 function NotificationsList() {
   const { user } = useAuth();
+  const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState('All');
   const [loading, setLoading] = useState(true);
@@ -35,13 +37,17 @@ function NotificationsList() {
     
     const q = query(
       collection(db, 'notifications'),
-      where('userId', 'in', [user.uid, 'all']),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const fetched = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setNotifications(fetched);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error loading notifications', error);
       setLoading(false);
     });
 
@@ -109,12 +115,18 @@ function NotificationsList() {
           filteredNotifications.map(note => (
             <div 
               key={note.id} 
+              onClick={() => {
+                markAsRead(note.id);
+                const destination = note.link || note.metadata?.link;
+                if (destination) router.push(destination);
+              }}
               style={{ 
                 padding: 'var(--space-4)', 
                 borderRadius: 'var(--radius-md)', 
                 background: note.read ? 'var(--bg-secondary)' : 'rgba(99, 102, 241, 0.1)', 
                 border: note.read ? '1px solid var(--border-color)' : '1px solid var(--accent-primary)',
-                display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-start'
+                display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-start',
+                cursor: note.link || note.metadata?.link ? 'pointer' : 'default'
               }}
             >
               <div style={{ flex: 1 }}>
@@ -133,11 +145,11 @@ function NotificationsList() {
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
                   {!note.read && (
-                    <button onClick={() => markAsRead(note.id)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--space-1) 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button onClick={(event) => { event.stopPropagation(); markAsRead(note.id); }} style={{ fontSize: 'var(--fs-xs)', color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--space-1) 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       ✓ Mark Read
                     </button>
                   )}
-                  <button onClick={() => deleteNotification(note.id)} style={{ fontSize: 'var(--fs-xs)', color: 'var(--accent-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--space-1) 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <button onClick={(event) => { event.stopPropagation(); deleteNotification(note.id); }} style={{ fontSize: 'var(--fs-xs)', color: 'var(--accent-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--space-1) 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     🗑 Delete
                   </button>
                 </div>

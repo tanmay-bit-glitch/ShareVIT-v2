@@ -29,7 +29,7 @@ export const addToCart = async (userId, product, quantity = 1) => {
       `Added to Cart`,
       `You added ${product.title} to your cart.`,
       'System',
-      { productId: product.id }
+      { link: '/cart', productId: product.id }
     );
 
     // Notify Seller
@@ -39,7 +39,7 @@ export const addToCart = async (userId, product, quantity = 1) => {
         `Item Added to Cart`,
         `A student added your ${product.title} listing to their cart!`,
         'Marketplace',
-        { productId: product.id, type: 'cart_add' }
+        { link: `/marketplace/${product.id}`, productId: product.id, type: 'cart_add' }
       );
     }
 

@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { AlertOctagon, Link2 } from 'lucide-react';
+import { createNotification } from '@/lib/notifications';
 
 export default function ReportIssuePage() {
   return <ProtectedRoute><ReportIssueContent /></ProtectedRoute>;
@@ -44,14 +45,41 @@ function ReportIssueContent() {
         status: 'Open',
         createdAt: serverTimestamp()
       });
+
+      const emailResponse = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportId,
+          userName: userData?.displayName || 'Anonymous Student',
+          userEmail: user.email,
+          category,
+          severity,
+          title,
+          description,
+          screenshotUrl: screenshotUrl || null,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        throw new Error('The report was saved, but the administrator email could not be sent.');
+      }
+
+      await createNotification(
+        user.uid,
+        'Issue Report Submitted',
+        `Your report ${reportId} was sent to the administrator.`,
+        'System',
+        { link: '/report-issue', reportId, type: 'issue_report' }
+      );
       
-      toast.success(`Report ${reportId} submitted successfully! Our developers will inspect this.`);
+      toast.success(`Report ${reportId} submitted and sent to the administrator.`);
       setTitle('');
       setDescription('');
       setScreenshotUrl('');
     } catch (err) {
       console.error(err);
-      toast.error('Failed to submit report. Please try again.');
+      toast.error(err.message || 'Failed to submit report. Please try again.');
     } finally {
       setLoading(false);
     }

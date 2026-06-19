@@ -263,16 +263,14 @@ function CreateListingContent() {
       await addDoc(collection(db, 'listings'), listingData);
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1) });
       
-      // Trigger live notification for all users (so needy persons can see it instantly)
-      await addDoc(collection(db, 'notifications'), {
-        userId: 'all',
-        title: `🆕 New ${form.category} Uploaded!`,
-        message: `${userData?.displayName || 'A seller'} just added: ${form.title}. Check if it matches any open requests!`,
-        link: `/marketplace`,
-        createdAt: serverTimestamp(),
-        read: false,
-        type: 'new_listing'
-      });
+      await notifyGroup(
+        `🆕 New ${form.category} Uploaded!`,
+        `${userData?.displayName || 'A seller'} just added: ${form.title}. Check if it matches any open requests!`,
+        'Marketplace',
+        {},
+        { link: '/marketplace', type: 'new_listing' },
+        user.uid
+      );
 
       toast.success('Listing published successfully!');
       const categoryRoute = form.category.toLowerCase().replace(' ', '-');

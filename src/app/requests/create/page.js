@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { notifyGroup } from '@/lib/notifications';
 
 const categories = ['Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
 const urgencyLevels = ['Low', 'Medium', 'High', 'Urgent'];
@@ -34,6 +35,14 @@ function CreateContent() {
         responses: 0,
         createdAt: serverTimestamp(),
       });
+      await notifyGroup(
+        '📣 New Item Request',
+        `${userData?.displayName || 'Someone'} is looking for: ${form.title}. Do you have it?`,
+        'Marketplace',
+        {},
+        { link: '/requests', type: 'request' },
+        user.uid
+      );
       toast.success('Request posted!');
       router.push('/requests');
     } catch (err) { console.error(err); toast.error('Failed to post.'); }

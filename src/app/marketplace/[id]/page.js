@@ -108,7 +108,7 @@ function MarketplaceDetail() {
         `New Inquiry: ${item.title}`,
         `${userData?.displayName || 'Someone'} is interested in your item.`,
         'Marketplace',
-        { itemId: item.id, buyerId: user.uid, type: 'marketplace_inquiry' }
+        { link: `/marketplace/${item.id}`, itemId: item.id, buyerId: user.uid, type: 'marketplace_inquiry' }
       );
       toast.success('Inquiry sent! Opening email client...');
       window.location.href = `mailto:${item.sellerEmail}?subject=Interested in: ${item.title}`;

@@ -10,6 +10,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { removeFromCart, clearCart } from '@/lib/cart';
 import { useToast } from '@/context/ToastContext';
 import { CheckCircle } from 'lucide-react';
+import { createNotification } from '@/lib/notifications';
 
 export default function CartPage() {
   return <ProtectedRoute><CartContent /></ProtectedRoute>;
@@ -149,7 +150,23 @@ function CartContent() {
           lastMessage: "Order Request sent!",
           updatedAt: serverTimestamp()
         });
+
+        await createNotification(
+          seller.sellerId,
+          '🛒 New Order Request',
+          `${myName} requested ${seller.items.length} item${seller.items.length === 1 ? '' : 's'} from you.`,
+          'Marketplace',
+          { link: '/chat', type: 'order_request' }
+        );
       }
+
+      await createNotification(
+        user.uid,
+        'Order Request Sent',
+        `Your order request was sent to ${sellersList.length} seller${sellersList.length === 1 ? '' : 's'}.`,
+        'Marketplace',
+        { link: '/chat', type: 'order_confirmation' }
+      );
 
       // 4. Clear Cart
       await clearCart(user.uid);

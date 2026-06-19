@@ -21,6 +21,7 @@ export const createNotification = async (userId, title, message, category, metad
       message,
       category,
       metadata,
+      link: metadata.link || null,
       read: false,
       createdAt: serverTimestamp()
     });
@@ -74,6 +75,7 @@ export const notifyGroup = async (title, message, category, filters = {}, metada
         message,
         category,
         metadata,
+        link: metadata.link || null,
         read: false,
         createdAt: serverTimestamp()
       });

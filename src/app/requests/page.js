@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { notifyGroup } from '@/lib/notifications';
 import { 
   ClipboardList, Plus, X, AlertCircle, Calendar, MessageSquare, 
   MapPin, HelpCircle, Heart, DollarSign 
@@ -77,16 +78,14 @@ function RequestsContent() {
         createdAt: serverTimestamp(),
       });
 
-      // Broadcast notification to all users
-      await addDoc(collection(db, 'notifications'), {
-        userId: 'all',
-        title: '📣 New Item Request',
-        message: `${userData?.displayName || 'Someone'} is looking for: ${form.title}. Do you have it?`,
-        link: '/requests',
-        createdAt: serverTimestamp(),
-        read: false,
-        type: 'request'
-      });
+      await notifyGroup(
+        '📣 New Item Request',
+        `${userData?.displayName || 'Someone'} is looking for: ${form.title}. Do you have it?`,
+        'Marketplace',
+        {},
+        { link: '/requests', type: 'request' },
+        user.uid
+      );
 
       toast.success('Request posted to the campus board!');
       setForm({ title: '', description: '', category: 'Books', urgency: 'Medium', budget: '', duration: '' });

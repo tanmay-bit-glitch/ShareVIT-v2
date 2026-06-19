@@ -12,7 +12,7 @@ import {
   HelpCircle, AlertCircle, ShieldCheck, ClipboardList, Home, PlusCircle, Search, X,
   FileText, BookOpen, Laptop, FolderOpen
 } from 'lucide-react';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'PYQs', 'Marketplace Items', 'Miscellaneous'];
@@ -83,14 +83,17 @@ export default function Navbar() {
 
     const q = query(
       collection(db, 'notifications'),
-      where('userId', 'in', [user.uid, 'all']),
-      orderBy('createdAt', 'desc'),
-      limit(20)
+      where('userId', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const fetched = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+        .slice(0, 20);
       setNotifications(fetched);
+    }, (error) => {
+      console.error('Error loading navbar notifications', error);
     });
 
     return () => unsubscribe();
@@ -320,9 +323,13 @@ export default function Navbar() {
                     <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--text-tertiary)' }}>No recent updates.</div>
                   ) : (
                     notifications.map(note => (
-                      <div 
+                      <div
                         key={note.id} 
-                        onClick={() => markAsRead(note.id)}
+                        onClick={() => {
+                          markAsRead(note.id);
+                          const destination = note.link || note.metadata?.link;
+                          if (destination) window.location.href = destination;
+                        }}
                         style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-color)', background: note.read ? 'transparent' : 'rgba(99, 102, 241, 0.05)', transition: 'background 0.2s', cursor: 'pointer' }} 
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -331,7 +338,7 @@ export default function Navbar() {
                             {note.createdAt?.toDate ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric' }).format(note.createdAt.toDate()) : 'Now'}
                           </span>
                         </div>
-                        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>{note.text}</p>
+                        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>{note.message || note.text}</p>
                       </div>
                     ))
                   )}

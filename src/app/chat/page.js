@@ -10,6 +10,7 @@ import { useGamification } from '@/context/GamificationContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { MessagesSquare, Send, Hash, Menu, X, Image as ImageIcon, CheckCircle, ExternalLink, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
+import { createNotification } from '@/lib/notifications';
 
 const PUBLIC_ROOMS = [
   { id: 'general',          label: 'general',          emoji: '💬', col: 'chatMessages',            desc: 'General announcements and student chatter', type: 'public' },
@@ -116,7 +117,8 @@ function ChatContent() {
         label: otherName,
         emoji: '👤',
         type: 'dm',
-        desc: 'Direct Message'
+        desc: 'Direct Message',
+        data: { participants: [user.uid, sellerIdParam] }
       });
     };
     setupDm();
@@ -193,6 +195,17 @@ function ChatContent() {
         lastMessage: lastMsgSnippet,
         updatedAt: serverTimestamp()
       });
+
+      const recipientId = room.data?.participants?.find(id => id !== user.uid);
+      if (recipientId) {
+        await createNotification(
+          recipientId,
+          `New message from ${userData?.displayName || 'a student'}`,
+          msgText || '📷 Sent an image',
+          'Community',
+          { link: '/chat', chatId: room.id, type: 'direct_message' }
+        );
+      }
     } else {
       // Public room
       await addDoc(collection(db, room.col), msgData);
@@ -435,7 +448,7 @@ function ChatContent() {
         }}>
           {/* Header */}
           <div style={{ padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button className="navbar-hamburger" onClick={() => setChannelsOpen(!channelsOpen)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
+            <button onClick={() => setChannelsOpen(!channelsOpen)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
               <Menu size={20} />
             </button>
             {room.type === 'dm' ? (

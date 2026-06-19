@@ -7,6 +7,7 @@ import { uploadDocument, validateDocument } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { notifyGroup } from '@/lib/notifications';
 
 const types = ['Assignment', 'Lab Manual', 'Project Report', 'Mini Project'];
 const departments = ['Computer Engineering', 'IT', 'AI & DS', 'Electronics', 'Mechanical', 'Civil', 'Chemical', 'Instrumentation'];
@@ -46,6 +47,14 @@ function UploadContent() {
         createdAt: serverTimestamp()
       });
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1), reputation: increment(5) });
+      await notifyGroup(
+        `🆕 New ${form.type} Uploaded!`,
+        `${userData?.displayName || 'Someone'} uploaded "${form.title}"${form.subject ? ` for ${form.subject}` : ''}.`,
+        'Academic',
+        form.department ? { department: form.department } : {},
+        { link: '/assignments', type: 'new_assignment' },
+        user.uid
+      );
       toast.success('Assignment uploaded! +5 reputation');
       router.push('/assignments');
     } catch (err) { console.error(err); toast.error('Upload failed.'); }
