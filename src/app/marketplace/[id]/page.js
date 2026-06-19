@@ -3,17 +3,20 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { useGamification } from '@/context/GamificationContext';
 import { createNotification } from '@/lib/notifications';
 import { addToCart } from '@/lib/cart';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { 
   Heart, Share2, AlertTriangle, MessageSquare, Mail, ShoppingCart, 
-  ShieldCheck, Eye, Calendar, User, ChevronLeft, Star, Award 
+  ShieldCheck, Eye, Calendar, User, ChevronLeft, Star, Award, X
 } from 'lucide-react';
+
+const CATEGORIES = ['All', 'Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
 
 export default function MarketplaceDetailPage() {
   return (
@@ -28,8 +31,9 @@ export default function MarketplaceDetailPage() {
 function MarketplaceDetail() {
   const { id } = useParams();
   const router = useRouter();
-  const { user, userData } = useAuth();
+  const { user, userData, refreshUserData } = useAuth();
   const toast = useToast();
+  const { gainXP } = useGamification();
 
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,11 +41,35 @@ function MarketplaceDetail() {
   const [isSaved, setIsSaved] = useState(false);
   const [savesCount, setSavesCount] = useState(0);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    price: 0,
+    condition: 'Good',
+    category: 'Books',
+    location: 'Campus'
+  });
+
+  // Populate edit form on edit start
+  useEffect(() => {
+    if (item) {
+      setEditForm({
+        title: item.title || '',
+        description: item.description || '',
+        price: item.price || 0,
+        condition: item.condition || 'Good',
+        category: item.category || 'Books',
+        location: item.location || 'Campus'
+      });
+    }
+  }, [item, isEditing]);
+
   // Fetch listing & increment views
   useEffect(() => {
     const fetchItemAndIncrement = async () => {
       try {
-        const docRef = doc(db, 'marketplace', id);
+        const docRef = doc(db, 'listings', id);
         
         // 1. Increment views in Firestore
         await updateDoc(docRef, {
@@ -54,10 +82,6 @@ function MarketplaceDetail() {
           const data = snap.id ? { id: snap.id, ...snap.data() } : snap.data();
           setItem(data);
           setSavesCount(data.saves || 0);
-          
-          // Check if user has this item saved (simulate with localStorage or local state)
-          const savedItems = JSON.parse(localStorage.getItem('wishlist') || '[]');
-          setIsSaved(savedItems.includes(id));
         }
       } catch (err) {
         console.error('Error fetching item details:', err);
@@ -68,6 +92,13 @@ function MarketplaceDetail() {
     
     if (id) fetchItemAndIncrement();
   }, [id]);
+
+  // Sync isSaved with userData.wishlist
+  useEffect(() => {
+    if (userData && id) {
+      setIsSaved(userData.wishlist?.includes(id) || false);
+    }
+  }, [userData, id]);
 
   const handleContactSeller = async () => {
     if (!item) return;
@@ -101,26 +132,89 @@ function MarketplaceDetail() {
   };
 
   const toggleSave = async () => {
-    if (!item) return;
-    const savedItems = JSON.parse(localStorage.getItem('wishlist') || '[]');
-    const docRef = doc(db, 'marketplace', id);
+    if (!item || !user) return;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const docRef = doc(db, 'listings', id);
+      const currentWishlist = userData?.wishlist || [];
+      const saved = currentWishlist.includes(id);
+      
+      let newWishlist;
+      if (saved) {
+        newWishlist = currentWishlist.filter(x => x !== id);
+        setIsSaved(false);
+        setSavesCount(prev => Math.max(0, prev - 1));
+        await updateDoc(docRef, { saves: increment(-1) });
+        toast.success('Removed from wishlist');
+      } else {
+        newWishlist = [...currentWishlist, id];
+        setIsSaved(true);
+        setSavesCount(prev => prev + 1);
+        await updateDoc(docRef, { saves: increment(1) });
+        toast.success('Saved to wishlist!');
+      }
 
-    if (isSaved) {
-      // Remove from wishlist
-      const updated = savedItems.filter(x => x !== id);
-      localStorage.setItem('wishlist', JSON.stringify(updated));
-      setIsSaved(false);
-      setSavesCount(prev => Math.max(0, prev - 1));
-      await updateDoc(docRef, { saves: increment(-1) });
-      toast.success('Removed from wishlist');
-    } else {
-      // Add to wishlist
-      savedItems.push(id);
-      localStorage.setItem('wishlist', JSON.stringify(savedItems));
-      setIsSaved(true);
-      setSavesCount(prev => prev + 1);
-      await updateDoc(docRef, { saves: increment(1) });
-      toast.success('Saved to wishlist!');
+      await updateDoc(userRef, { wishlist: newWishlist });
+      if (refreshUserData) await refreshUserData();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update wishlist.');
+    }
+  };
+
+  const handleDeleteListing = async () => {
+    if (!confirm('Are you sure you want to delete this listing?')) return;
+    try {
+      await deleteDoc(doc(db, 'listings', id));
+      toast.success('Listing deleted!');
+      router.push('/marketplace');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete listing.');
+    }
+  };
+
+  const handleUpdateStatus = async (newStatus) => {
+    try {
+      await updateDoc(doc(db, 'listings', id), {
+        status: newStatus
+      });
+      
+      if (newStatus === 'Sold' && item.listingType === 'Sell') {
+        gainXP(100, 'Completed sale of: ' + item.title);
+      } else if (newStatus === 'Rented' && item.listingType === 'Rent') {
+        gainXP(80, 'Rented out: ' + item.title);
+      } else {
+        gainXP(40, 'Completed transaction for: ' + item.title);
+      }
+
+      setItem(prev => ({ ...prev, status: newStatus }));
+      toast.success(`Listing marked as ${newStatus}!`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update status.');
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    try {
+      const docRef = doc(db, 'listings', id);
+      const updatedData = {
+        title: editForm.title,
+        description: editForm.description,
+        price: Number(editForm.price) || 0,
+        condition: editForm.condition,
+        category: editForm.category,
+        location: editForm.location
+      };
+      await updateDoc(docRef, updatedData);
+      setItem(prev => ({ ...prev, ...updatedData }));
+      setIsEditing(false);
+      toast.success('Listing updated successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update listing.');
     }
   };
 
@@ -279,7 +373,7 @@ function MarketplaceDetail() {
                       <button onClick={handleContactSeller} className="btn btn-secondary" style={{ gap: '6px' }}>
                         <Mail size={16} /> Email Seller
                       </button>
-                      <Link href="/chat" className="btn btn-secondary" style={{ gap: '6px' }}>
+                      <Link href={`/chat?itemId=${item.id}`} className="btn btn-secondary" style={{ gap: '6px' }}>
                         <MessageSquare size={16} /> Chat Now
                       </Link>
                     </div>
@@ -290,8 +384,36 @@ function MarketplaceDetail() {
                     </button>
                   </>
                 ) : (
-                  <div style={{ padding: 'var(--space-4)', background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', margin: 0 }}>This is your active listing.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ padding: 'var(--space-4)', background: 'rgba(99, 102, 241, 0.05)', border: '1px dashed var(--accent-primary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                      <p style={{ color: 'var(--accent-primary-hover)', fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: 0 }}>This is your listing (Status: {item.status || 'active'})</p>
+                    </div>
+                    
+                    {item.status === 'active' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        {item.listingType === 'Sell' && (
+                          <button onClick={() => handleUpdateStatus('Sold')} className="btn btn-primary btn-sm">Mark Sold</button>
+                        )}
+                        {item.listingType === 'Rent' && (
+                          <button onClick={() => handleUpdateStatus('Rented')} className="btn btn-primary btn-sm">Mark Rented</button>
+                        )}
+                        {item.listingType === 'Exchange' && (
+                          <button onClick={() => handleUpdateStatus('Exchanged')} className="btn btn-primary btn-sm">Mark Exchanged</button>
+                        )}
+                        {item.listingType === 'Donate' && (
+                          <button onClick={() => handleUpdateStatus('Completed')} className="btn btn-primary btn-sm">Mark Donated</button>
+                        )}
+                        <button onClick={() => setIsEditing(true)} className="btn btn-secondary btn-sm">Edit Item</button>
+                      </div>
+                    )}
+
+                    {item.status !== 'active' && (
+                      <button onClick={() => handleUpdateStatus('active')} className="btn btn-secondary btn-full btn-sm">Re-activate Listing</button>
+                    )}
+
+                    <button onClick={handleDeleteListing} className="btn btn-ghost btn-full btn-sm" style={{ color: 'var(--accent-danger)' }}>
+                      Delete Listing
+                    </button>
                   </div>
                 )}
               </div>
@@ -355,7 +477,70 @@ function MarketplaceDetail() {
 
           </div>
 
-        </div>
+      </div>
+
+      {/* Edit Modal */}
+      {isEditing && (
+        <>
+          <div className="bottom-sheet-overlay" onClick={() => setIsEditing(false)} style={{ zIndex: 10000 }} />
+          <div className="card-glass" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10001, width: '90%', maxWidth: '500px', padding: 'var(--space-6)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+              <h3 style={{ margin: 0, color: '#fff' }}>Edit Listing</h3>
+              <button className="btn btn-ghost btn-sm" onClick={() => setIsEditing(false)} style={{ padding: '4px' }}><X size={18} /></button>
+            </div>
+            
+            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className="form-group">
+                <label className="form-label">Title</label>
+                <input type="text" className="form-input" value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Description</label>
+                <textarea className="form-textarea" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} style={{ minHeight: '100px' }} required />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Price (₹)</label>
+                  <input type="number" className="form-input" value={editForm.price} onChange={e => setEditForm(p => ({ ...p, price: e.target.value }))} disabled={item.listingType === 'Donate' || item.listingType === 'Exchange'} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Condition</label>
+                  <select className="form-select" value={editForm.condition} onChange={e => setEditForm(p => ({ ...p, condition: e.target.value }))}>
+                    <option value="New">New</option>
+                    <option value="Like New">Like New</option>
+                    <option value="Good">Good</option>
+                    <option value="Fair">Fair</option>
+                    <option value="Poor">Poor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Category</label>
+                  <select className="form-select" value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}>
+                    {CATEGORIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Location</label>
+                  <select className="form-select" value={editForm.location} onChange={e => setEditForm(p => ({ ...p, location: e.target.value }))}>
+                    <option value="Hostel">Hostel</option>
+                    <option value="Campus">Campus</option>
+                    <option value="Outside Campus">Outside Campus</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: 'var(--space-4)' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsEditing(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
 
       </div>
     </div>

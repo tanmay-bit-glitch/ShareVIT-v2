@@ -92,7 +92,7 @@ function ProfileContent() {
     if (!user) return;
 
     // 1. Listings
-    const listingsQ = query(collection(db, 'marketplace'), where('sellerId', '==', user.uid));
+    const listingsQ = query(collection(db, 'listings'), where('sellerId', '==', user.uid));
     const unsubListings = onSnapshot(listingsQ, (snap) => {
       setUserListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -104,10 +104,10 @@ function ProfileContent() {
       setUserRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    // 3. Wishlist IDs from LocalStorage
-    const savedIds = JSON.parse(localStorage.getItem('wishlist') || '[]');
+    // 3. Wishlist IDs from Database user doc
+    const savedIds = userData?.wishlist || [];
     if (savedIds.length > 0) {
-      const wishlistQ = query(collection(db, 'marketplace'));
+      const wishlistQ = query(collection(db, 'listings'));
       const unsubWishlist = onSnapshot(wishlistQ, (snap) => {
         const allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setWishlistItems(allItems.filter(item => savedIds.includes(item.id)));
@@ -125,7 +125,7 @@ function ProfileContent() {
       unsubListings();
       unsubRequests();
     };
-  }, [user]);
+  }, [user, userData]);
 
   // Fetch reviews (fallback to empty)
   useEffect(() => {

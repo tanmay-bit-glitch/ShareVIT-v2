@@ -14,7 +14,7 @@ import {
   FileText, DollarSign, Eye, ShoppingCart 
 } from 'lucide-react';
 
-const CATEGORIES = ['Books', 'Electronics', 'Lab Equipment', 'Stationery', 'Sports', 'Furniture', 'Clothing', 'Other'];
+const CATEGORIES = ['Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
 const LISTING_TYPES = ['Sell', 'Rent', 'Donate', 'Exchange'];
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 const LOCATIONS = ['Hostel', 'Campus', 'Outside Campus'];
@@ -119,7 +119,7 @@ function CreateListingContent() {
         createdAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'marketplace'), listingData);
+      await addDoc(collection(db, 'listings'), listingData);
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1) });
       
       // Trigger notifications for campus mates

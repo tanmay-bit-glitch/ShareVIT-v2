@@ -12,7 +12,7 @@ import {
   MapPin, HelpCircle, Heart, DollarSign 
 } from 'lucide-react';
 
-const CATEGORIES = ['Books', 'Notes', 'Equipment', 'Electronics', 'Assignment Help', 'Other'];
+const CATEGORIES = ['Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
 const URGENCY_LEVELS = ['Low', 'Medium', 'High', 'Urgent'];
 const URGENCY_BADGES = {
   Low: 'badge-info',

@@ -1,10 +1,15 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { useSearchParams } from 'next/navigation';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import { useGamification } from '@/context/GamificationContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { MessagesSquare, Send, Hash, Menu, X } from 'lucide-react';
+import { MessagesSquare, Send, Hash, Menu, X, Image as ImageIcon, CheckCircle, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 const ROOMS = [
   { id: 'general',          label: 'general',          emoji: '💬', col: 'chatMessages',            desc: 'General announcements and student chatter' },
@@ -16,17 +21,67 @@ const ROOMS = [
   { id: 'marketplace-help', label: 'marketplace-help', emoji: '🛒', col: 'chatMessages_market',     desc: 'Help with transactions, items & requests' },
 ];
 
-export default function ChatPage() { return <ProtectedRoute><ChatContent /></ProtectedRoute>; }
+export default function ChatPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={
+        <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#94a3b8' }}>
+          <div className="spinner spinner-lg" />
+        </div>
+      }>
+        <ChatContent />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}
 
 function ChatContent() {
+  const { user, userData } = useAuth();
+  const toast = useToast();
+  const { gainXP } = useGamification();
+  const searchParams = useSearchParams();
+  const itemId = searchParams.get('itemId');
+
   const [room, setRoom] = useState(ROOMS[0]);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [channelsOpen, setChannelsOpen] = useState(true);
-  const { user, userData } = useAuth();
-  const bottomRef = useRef(null);
+  const [activeItem, setActiveItem] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  // Auto-route to marketplace-help room if itemId is present
+  useEffect(() => {
+    if (itemId) {
+      const marketRoom = ROOMS.find(r => r.id === 'marketplace-help');
+      if (marketRoom) {
+        setRoom(marketRoom);
+      }
+    }
+  }, [itemId]);
+
+  // Fetch active item details for listing context
+  useEffect(() => {
+    if (!itemId) {
+      setActiveItem(null);
+      return;
+    }
+    const fetchItem = async () => {
+      try {
+        const docRef = doc(db, 'listings', itemId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          setActiveItem({ id: snap.id, ...snap.data() });
+        }
+      } catch (err) {
+        console.error("Error fetching active item for chat context:", err);
+      }
+    };
+    fetchItem();
+  }, [itemId]);
 
   useEffect(() => {
     setMessages([]);
@@ -46,7 +101,7 @@ function ChatContent() {
   }, [messages]);
 
   const handleSend = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!input.trim() || sending) return;
     setSending(true);
     try {
@@ -57,8 +112,85 @@ function ChatContent() {
         createdAt: serverTimestamp(),
       });
       setInput('');
-    } catch (err) { console.error(err); }
-    finally { setSending(false); }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to send message.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleAttachClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `chats/${room.id}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      await addDoc(collection(db, room.col), {
+        text: '',
+        mediaUrl: downloadURL,
+        senderId: user.uid,
+        senderName: userData?.displayName || 'Anonymous',
+        createdAt: serverTimestamp(),
+      });
+
+      toast.success('Image sent!');
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      toast.error('Failed to upload image.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleMarkCompleted = async () => {
+    if (!activeItem || !user || activeItem.sellerId !== user.uid) return;
+
+    let finalStatus = 'Completed';
+    if (activeItem.listingType === 'Sell') finalStatus = 'Sold';
+    else if (activeItem.listingType === 'Rent') finalStatus = 'Rented';
+    else if (activeItem.listingType === 'Exchange') finalStatus = 'Exchanged';
+
+    try {
+      const docRef = doc(db, 'listings', activeItem.id);
+      await updateDoc(docRef, { status: finalStatus });
+
+      let xpAmount = 40;
+      if (finalStatus === 'Sold') xpAmount = 100;
+      else if (finalStatus === 'Rented') xpAmount = 80;
+      gainXP(xpAmount, `Completed transaction for: ${activeItem.title}`);
+
+      await addDoc(collection(db, room.col), {
+        text: `🎉 TRANSACTION STATUS UPDATE: "${activeItem.title}" has been marked as ${finalStatus} by the seller. Thank you for using ShareVIT!`,
+        senderId: 'system',
+        senderName: 'System',
+        createdAt: serverTimestamp(),
+      });
+
+      setActiveItem(prev => ({ ...prev, status: finalStatus }));
+      toast.success(`Listing marked as ${finalStatus}!`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update status.');
+    }
   };
 
   return (
@@ -164,6 +296,94 @@ function ChatContent() {
             </div>
           </div>
 
+          {/* Active Item Context Banner */}
+          {activeItem && (
+            <div className="active-item-banner" style={{
+              padding: '12px 24px',
+              background: 'rgba(99, 102, 241, 0.08)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {activeItem.imageUrl ? (
+                  <img 
+                    src={activeItem.imageUrl} 
+                    alt={activeItem.title} 
+                    style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>📦</div>
+                )}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px' }}>{activeItem.title}</span>
+                    <span className={`badge ${activeItem.listingType === 'Donate' ? 'badge-success' : activeItem.listingType === 'Sell' ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                      {activeItem.listingType}
+                    </span>
+                    {activeItem.status && activeItem.status !== 'active' && (
+                      <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '2px 6px', background: '#475569' }}>
+                        {activeItem.status}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                    Seller: {activeItem.sellerName || 'Verified Student'} • Price: {activeItem.price > 0 ? `₹${activeItem.price}` : 'Free'} • Condition: {activeItem.condition}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {user && activeItem.sellerId === user.uid && (!activeItem.status || activeItem.status === 'active') && (
+                  <button 
+                    onClick={handleMarkCompleted}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.opacity = '0.9'}
+                    onMouseOut={e => e.currentTarget.style.opacity = '1'}
+                  >
+                    <CheckCircle size={14} /> Mark Completed
+                  </button>
+                )}
+                
+                <Link 
+                  href={`/marketplace/${activeItem.id}`}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    color: '#f8fafc',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <ExternalLink size={14} /> View Item
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Messages */}
           <div className="chat-messages" style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
             {messages.length === 0 && (
@@ -173,6 +393,29 @@ function ChatContent() {
             )}
             {messages.map((msg) => {
               const isUser = msg.senderId === user?.uid;
+              const isSystem = msg.senderId === 'system';
+
+              if (isSystem) {
+                return (
+                  <div key={msg.id} style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '10px 16px',
+                    margin: '8px 0',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px dashed rgba(99, 102, 241, 0.2)',
+                    borderRadius: '12px',
+                    color: '#a5b4fc',
+                    fontSize: '13px',
+                    textAlign: 'center',
+                    width: '100%',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}>
+                    <span>{msg.text}</span>
+                  </div>
+                );
+              }
               
               const getAvatarColor = (name) => {
                 const colors = ['#f43f5e', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
@@ -205,7 +448,7 @@ function ChatContent() {
                   </div>
 
                   {/* Message Content Wrapper */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', maxWidth: '100%' }}>
                     {!isUser && (
                       <span style={{ fontSize: '12.5px', fontWeight: '500', color: '#94a3b8', marginBottom: '4px', marginLeft: '4px' }}>
                         {senderName}
@@ -221,9 +464,29 @@ function ChatContent() {
                       border: isUser ? 'none' : '1px solid rgba(255,255,255,0.05)',
                       color: '#f8fafc',
                       overflowWrap: 'break-word',
-                      minWidth: '80px'
+                      minWidth: '80px',
+                      maxWidth: '100%'
                     }}>
-                      <p style={{ lineHeight: '1.6' }}>{msg.text}</p>
+                      {msg.text && <p style={{ lineHeight: '1.6', margin: 0 }}>{msg.text}</p>}
+                      
+                      {msg.mediaUrl && (
+                        <img 
+                          src={msg.mediaUrl} 
+                          alt="Sent attachment" 
+                          loading="lazy" 
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '260px',
+                            borderRadius: '12px',
+                            marginTop: msg.text ? '8px' : '0',
+                            display: 'block',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                          }}
+                          onClick={() => window.open(msg.mediaUrl, '_blank')}
+                        />
+                      )}
+
                       <p style={{ 
                         fontSize: '10px', 
                         color: isUser ? 'rgba(255,255,255,0.75)' : '#94a3b8', 
@@ -232,7 +495,8 @@ function ChatContent() {
                         justifyContent: 'flex-end',
                         alignItems: 'center',
                         gap: '4px',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        margin: '6px 0 0 0'
                       }}>
                         {msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}
                         {isUser && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
@@ -247,12 +511,46 @@ function ChatContent() {
 
           {/* Input Bar */}
           <div style={{ padding: '20px 32px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <form onSubmit={handleSend} style={{ display: 'flex', gap: '16px' }}>
+            <form onSubmit={handleSend} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                style={{ display: 'none' }} 
+              />
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                disabled={uploading || sending}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '50%',
+                  width: '42px',
+                  height: '42px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#cbd5e1',
+                  cursor: (uploading || sending) ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}
+                title="Send Image"
+              >
+                {uploading ? (
+                  <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: 'var(--accent-primary)' }} />
+                ) : (
+                  <ImageIcon size={18} />
+                )}
+              </button>
+
               <input
-                placeholder={`Message #${room.label}`}
+                placeholder={uploading ? "Uploading image..." : `Message #${room.label}`}
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                disabled={sending}
+                disabled={sending || uploading}
                 style={{
                   flex: 1,
                   background: '#0b0f19',
@@ -273,18 +571,19 @@ function ChatContent() {
               />
               <button
                 type="submit"
-                disabled={sending || !input.trim()}
+                disabled={sending || uploading || !input.trim()}
                 style={{
                   background: '#6366f1',
                   color: 'white',
                   border: 'none',
                   borderRadius: '24px',
                   padding: '0 20px',
+                  height: '42px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  cursor: (sending || !input.trim()) ? 'not-allowed' : 'pointer',
-                  opacity: (sending || !input.trim()) ? 0.6 : 1,
+                  cursor: (sending || uploading || !input.trim()) ? 'not-allowed' : 'pointer',
+                  opacity: (sending || uploading || !input.trim()) ? 0.6 : 1,
                   fontWeight: '500'
                 }}
               >
@@ -301,4 +600,4 @@ function ChatContent() {
       </div>
     </div>
   );
-}
+}

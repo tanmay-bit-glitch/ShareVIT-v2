@@ -39,7 +39,7 @@ function CartContent() {
       const productData = {};
       for (const item of items) {
         if (!products[item.productId]) {
-          const prodSnap = await getDoc(doc(db, 'marketplace', item.productId));
+          const prodSnap = await getDoc(doc(db, 'listings', item.productId));
           if (prodSnap.exists()) {
             productData[item.productId] = { id: prodSnap.id, ...prodSnap.data() };
           }

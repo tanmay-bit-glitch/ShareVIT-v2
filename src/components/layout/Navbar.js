@@ -6,22 +6,25 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useGamification } from '@/context/GamificationContext';
 import { 
-  Bell, Menu, X, ShoppingCart, Briefcase, Users, Trophy, 
+  Bell, ShoppingCart, Briefcase, Users, Trophy, 
   Sparkles, MessageSquare, User, LogOut, ChevronDown, Plus, Heart, 
   Star, Settings, Tag, Package, Flame, Clock, Award, 
-  HelpCircle, AlertCircle, ShieldCheck, ClipboardList, Home, PlusCircle
+  HelpCircle, AlertCircle, ShieldCheck, ClipboardList, Home, PlusCircle, Search, X
 } from 'lucide-react';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+
+const CATEGORIES = ['All', 'Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
 
 export default function Navbar() {
   const { user, userData, signOut, isAuthenticated } = useAuth();
   const { level, streak } = useGamification();
   const pathname = usePathname();
   
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null); // 'marketplace', 'community', 'tools', 'profile', 'notifications'
   const [notifications, setNotifications] = useState([]);
+  const [activeBottomSheet, setActiveBottomSheet] = useState(null); // 'marketplace', 'community', 'tools'
+  const [desktopSearch, setDesktopSearch] = useState('');
   
   const navbarRef = useRef(null);
   const notificationsRef = useRef(null);
@@ -49,8 +52,8 @@ export default function Navbar() {
   const toolsLinks = [
     { href: '/ai-assistant', label: 'AI Assistant', icon: Sparkles },
     { href: '/chat', label: 'Chat', icon: MessageSquare },
-    { href: '/academics', label: 'Help Center', icon: HelpCircle },
-    { href: 'mailto:support@sharevit.com', label: 'Report Issue', icon: AlertCircle }
+    { href: '/help-center', label: 'Help Center', icon: HelpCircle },
+    { href: '/report-issue', label: 'Report Issue', icon: AlertCircle }
   ];
 
   const profileLinks = [
@@ -106,17 +109,11 @@ export default function Navbar() {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Close mobile nav on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
   const getInitials = (name) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
-  // Check if link matches active route + active URL query params
   const isLinkActive = (linkHref) => {
     if (!pathname) return false;
     const [path, queryStr] = linkHref.split('?');
@@ -151,9 +148,8 @@ export default function Navbar() {
       <nav className="navbar">
         <div className="navbar-inner">
           <div className="navbar-left">
-            <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center' }}>
               <img src="/logo.png" alt="ShareVIT Logo" style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
-              <span>Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
             </Link>
           </div>
           <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
@@ -172,24 +168,14 @@ export default function Navbar() {
       {/* Top Header Navbar */}
       <header className="top-header" ref={navbarRef}>
         
-        {/* Left: Hamburger + Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <button 
-            className="navbar-hamburger" 
-            onClick={() => setMobileOpen(true)} 
-            aria-label="Open sidebar"
-            style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          >
-            <Menu size={24} />
-          </button>
-          
-          <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        {/* Left: Logo Only */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center' }}>
             <img src="/logo.png" alt="ShareVIT Logo" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
-            <span style={{ fontSize: 'var(--fs-md)', fontWeight: 'bold' }}>Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
           </Link>
         </div>
 
-        {/* Center: Dropdown Menus */}
+        {/* Center: Dropdown Menus (Desktop) */}
         <div className="hide-mobile" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           
           {/* Marketplace Dropdown */}
@@ -278,7 +264,34 @@ export default function Navbar() {
         {/* Right: Search, Notifications, Avatar, CTA */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           
-
+          {/* Search bar on Desktop */}
+          <div className="hide-mobile" style={{ position: 'relative' }}>
+            <input 
+              type="text" 
+              placeholder="Search listings..." 
+              value={desktopSearch}
+              onChange={(e) => setDesktopSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && desktopSearch.trim()) {
+                  window.location.href = `/marketplace?search=${encodeURIComponent(desktopSearch)}`;
+                }
+              }}
+              style={{ 
+                padding: '6px 12px 6px 32px', 
+                fontSize: '13px', 
+                borderRadius: 'var(--radius-full)', 
+                background: 'rgba(255,255,255,0.05)', 
+                border: '1px solid var(--border-color)', 
+                color: 'var(--text-primary)', 
+                outline: 'none',
+                width: '180px',
+                transition: 'width 0.25s ease'
+              }}
+              onFocus={(e) => e.target.style.width = '240px'}
+              onBlur={(e) => e.target.style.width = '180px'}
+            />
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+          </div>
 
           {/* Notifications */}
           <div style={{ position: 'relative' }} ref={notificationsRef}>
@@ -310,8 +323,6 @@ export default function Navbar() {
                         key={note.id} 
                         onClick={() => markAsRead(note.id)}
                         style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--border-color)', background: note.read ? 'transparent' : 'rgba(99, 102, 241, 0.05)', transition: 'background 0.2s', cursor: 'pointer' }} 
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-glass-hover)'} 
-                        onMouseLeave={e => e.currentTarget.style.background = note.read ? 'transparent' : 'rgba(99, 102, 241, 0.05)'}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                           <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-primary)' }}>{note.title}</strong>
@@ -370,101 +381,30 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile Drawer (Hidden on Desktop) */}
-      <aside className={`app-layout-sidebar ${mobileOpen ? 'open' : ''}`}>
-        <div className="app-layout-sidebar-header">
-          <Link href="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <img src="/logo.png" alt="ShareVIT Logo" style={{ width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
-            <span style={{ fontSize: 'var(--fs-md)', fontWeight: 'bold' }}>Share<span style={{ color: 'var(--accent-primary)' }}>VIT</span></span>
-          </Link>
-          <button 
-            className="sidebar-close" 
-            onClick={() => setMobileOpen(false)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="app-layout-sidebar-links">
-          {/* Mobile CTA */}
-          <Link href="/marketplace/create" className="btn btn-primary btn-full" style={{ marginBottom: 'var(--space-4)' }} onClick={() => setMobileOpen(false)}>
-            <Plus size={16} /> Sell Item
-          </Link>
-
-          {/* Marketplace Group */}
-          <div className="mobile-section-header">Marketplace</div>
-          {marketplaceLinks.map(link => (
-            <Link 
-              key={link.label} 
-              href={link.href} 
-              className={`app-layout-sidebar-link ${isLinkActive(link.href) ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-            >
-              <link.icon size={16} style={{ flexShrink: 0 }} />
-              <span>{link.label}</span>
-            </Link>
-          ))}
-
-          {/* Community Group */}
-          <div className="mobile-section-header">Community</div>
-          {communityLinks.map(link => (
-            <Link 
-              key={link.label} 
-              href={link.href} 
-              className={`app-layout-sidebar-link ${isLinkActive(link.href) ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-            >
-              <link.icon size={16} style={{ flexShrink: 0 }} />
-              <span>{link.label}</span>
-            </Link>
-          ))}
-
-          {/* Tools Group */}
-          <div className="mobile-section-header">Tools</div>
-          {toolsLinks.map(link => (
-            <Link 
-              key={link.label} 
-              href={link.href} 
-              className={`app-layout-sidebar-link ${isLinkActive(link.href) ? 'active' : ''}`}
-              onClick={() => setMobileOpen(false)}
-            >
-              <link.icon size={16} style={{ flexShrink: 0 }} />
-              <span>{link.label}</span>
-            </Link>
-          ))}
-        </nav>
-
-        {/* User Card Footer */}
-        <div className="app-layout-sidebar-footer">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div className="navbar-avatar" style={{ margin: 0, flexShrink: 0 }}>
-              {getInitials(userData?.displayName)}
-            </div>
-            <div style={{ overflow: 'hidden', flex: 1 }}>
-              <p style={{ fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)', fontSize: 'var(--fs-xs)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>
-                {userData?.displayName || 'Student'}
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                <span className="badge badge-info" style={{ fontSize: '8px', padding: '1px 4px' }}>
-                  Level {level}
-                </span>
-                <span className="badge badge-warning" style={{ fontSize: '8px', padding: '1px 4px', background: 'rgba(245,158,11,0.1)', border: 'none', color: 'var(--accent-warning)' }}>
-                  🔥 {streak}d
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile nav drawer overlay */}
-      {mobileOpen && (
-        <div 
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.5)', zIndex: 1002 }} 
-          onClick={() => setMobileOpen(false)} 
-        />
-      )}
+      {/* Mobile Sub-Header Chips Bar */}
+      <div className="show-mobile-only" style={{ position: 'fixed', top: 'var(--navbar-height)', left: 0, right: 0, height: '48px', background: 'rgba(10, 10, 15, 0.8)', backdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '0 var(--space-4)', zIndex: 999 }}>
+        <button 
+          className="btn btn-ghost" 
+          style={{ fontSize: '12px', padding: '4px 12px', borderRadius: 'var(--radius-full)', background: activeBottomSheet === 'marketplace' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.03)', border: activeBottomSheet === 'marketplace' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', color: activeBottomSheet === 'marketplace' ? 'var(--accent-primary-hover)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+          onClick={() => setActiveBottomSheet(activeBottomSheet === 'marketplace' ? null : 'marketplace')}
+        >
+          Marketplace <ChevronDown size={12} style={{ transform: activeBottomSheet === 'marketplace' ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        </button>
+        <button 
+          className="btn btn-ghost" 
+          style={{ fontSize: '12px', padding: '4px 12px', borderRadius: 'var(--radius-full)', background: activeBottomSheet === 'community' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.03)', border: activeBottomSheet === 'community' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', color: activeBottomSheet === 'community' ? 'var(--accent-primary-hover)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+          onClick={() => setActiveBottomSheet(activeBottomSheet === 'community' ? null : 'community')}
+        >
+          Community <ChevronDown size={12} style={{ transform: activeBottomSheet === 'community' ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        </button>
+        <button 
+          className="btn btn-ghost" 
+          style={{ fontSize: '12px', padding: '4px 12px', borderRadius: 'var(--radius-full)', background: activeBottomSheet === 'tools' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.03)', border: activeBottomSheet === 'tools' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)', color: activeBottomSheet === 'tools' ? 'var(--accent-primary-hover)' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}
+          onClick={() => setActiveBottomSheet(activeBottomSheet === 'tools' ? null : 'tools')}
+        >
+          Tools <ChevronDown size={12} style={{ transform: activeBottomSheet === 'tools' ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+        </button>
+      </div>
 
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">
@@ -489,6 +429,137 @@ export default function Navbar() {
           <span>Profile</span>
         </Link>
       </div>
+
+      {/* Mobile Bottom Sheets */}
+      {activeBottomSheet && (
+        <>
+          <div 
+            className="bottom-sheet-overlay" 
+            onClick={() => setActiveBottomSheet(null)} 
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 5, 8, 0.6)', backdropFilter: 'blur(8px)', zIndex: 2000 }}
+          />
+          
+          <div 
+            className="bottom-sheet" 
+            style={{ 
+              position: 'fixed', bottom: 0, left: 0, right: 0, 
+              background: 'rgba(15, 15, 25, 0.95)', backdropFilter: 'blur(24px) saturate(180%)',
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)', borderTopLeftRadius: '24px', borderTopRightRadius: '24px',
+              padding: '16px 20px calc(24px + env(safe-area-inset-bottom))', zIndex: 2001,
+              boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)',
+              maxHeight: '80vh', overflowY: 'auto',
+              display: 'flex', flexDirection: 'column'
+            }}
+          >
+            <div style={{ width: '40px', height: '4px', background: 'rgba(255, 255, 255, 0.2)', borderRadius: '2px', margin: '0 auto 12px' }} />
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>
+                {activeBottomSheet === 'marketplace' ? 'Marketplace Portal' : activeBottomSheet === 'community' ? 'Community Hub' : 'Student Utilities'}
+              </h3>
+              <button 
+                onClick={() => setActiveBottomSheet(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {activeBottomSheet === 'marketplace' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                    {marketplaceLinks.slice(0, 4).map(link => {
+                      const Icon = link.icon;
+                      return (
+                        <Link 
+                          key={link.label} 
+                          href={link.href} 
+                          className="btn btn-ghost" 
+                          style={{ justifyContent: 'flex-start', padding: '10px', fontSize: '12px', gap: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }} 
+                          onClick={() => setActiveBottomSheet(null)}
+                        >
+                          <Icon size={14} style={{ color: 'var(--accent-primary)' }} /> {link.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                    Explore Categories
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                    {CATEGORIES.slice(1).map(catName => (
+                      <Link 
+                        key={catName} 
+                        href={`/marketplace?category=${encodeURIComponent(catName)}`} 
+                        className="btn btn-ghost" 
+                        style={{ 
+                          padding: '8px 4px', fontSize: '10px', flexDirection: 'column', height: 'auto', gap: '4px',
+                          border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.01)'
+                        }} 
+                        onClick={() => setActiveBottomSheet(null)}
+                      >
+                        <span style={{ fontSize: '18px' }}>
+                          {catName === 'Books' ? '📚' : 
+                           catName === 'Electronics' ? '💻' : 
+                           catName === 'Gadgets' ? '🔌' : 
+                           catName === 'Cycles' ? '🚲' : 
+                           catName === 'Hostel Essentials' ? '🧹' : 
+                           catName === 'Lab Equipment' ? '🧪' : 
+                           catName === 'Stationery' ? '✏️' : 
+                           catName === 'Notes' ? '📝' : '📦'}
+                        </span>
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>{catName}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {activeBottomSheet === 'community' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {communityLinks.map(link => {
+                    const Icon = link.icon;
+                    return (
+                      <Link 
+                        key={link.label} 
+                        href={link.href} 
+                        className="btn btn-ghost" 
+                        style={{ justifyContent: 'flex-start', padding: '12px', border: '1px solid var(--border-color)', gap: '10px', fontSize: '13px', borderRadius: 'var(--radius-md)' }} 
+                        onClick={() => setActiveBottomSheet(null)}
+                      >
+                        <Icon size={16} style={{ color: 'var(--accent-primary)' }} />
+                        <span>{link.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              {activeBottomSheet === 'tools' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {toolsLinks.map(link => {
+                    const Icon = link.icon;
+                    return (
+                      <Link 
+                        key={link.label} 
+                        href={link.href} 
+                        className="btn btn-ghost" 
+                        style={{ justifyContent: 'flex-start', padding: '12px', border: '1px solid var(--border-color)', gap: '10px', fontSize: '13px', borderRadius: 'var(--radius-md)' }} 
+                        onClick={() => setActiveBottomSheet(null)}
+                      >
+                        <Icon size={16} style={{ color: 'var(--accent-primary)' }} />
+                        <span>{link.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

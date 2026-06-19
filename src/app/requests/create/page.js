@@ -7,7 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-const categories = ['Books', 'Notes', 'Equipment', 'Electronics', 'Assignment Help', 'Other'];
+const categories = ['Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
 const urgencyLevels = ['Low', 'Medium', 'High', 'Urgent'];
 
 export default function CreateRequestPage() { return <ProtectedRoute><CreateContent /></ProtectedRoute>; }

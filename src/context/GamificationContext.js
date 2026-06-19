@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 const GamificationContext = createContext();
 
@@ -31,9 +32,11 @@ const ACHIEVEMENTS_LIST = [
 
 export function GamificationProvider({ children }) {
   const { user, userData } = useAuth();
+  const toast = useToast();
+  
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(0);
-  const [streak, setStreak] = useState(1);
+  const [streak, setStreak] = useState(0);
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [xpToasts, setXpToasts] = useState([]);
   const [levelUpData, setLevelUpData] = useState(null);
@@ -42,92 +45,187 @@ export function GamificationProvider({ children }) {
 
   const initializedRef = useRef(false);
 
-  // Sync ref to hold latest values immediately and avoid stale closures
-  const stateRef = useRef({ level: 1, xp: 0, streak: 1, unlockedAchievements: [] });
-
-  // Persistence helpers
-  const saveState = async (l, x, s, ach) => {
-    localStorage.setItem('sv_level', l.toString());
-    localStorage.setItem('sv_xp', x.toString());
-    localStorage.setItem('sv_streak', s.toString());
-    localStorage.setItem('sv_achievements', JSON.stringify(ach));
-
-    if (user) {
-      try {
-        await updateDoc(doc(db, 'users', user.uid), {
-          level: l,
-          xp: x,
-          streak: s,
-          achievements: ach
-        });
-      } catch (err) {
-        console.error('Error updating Firestore user gamification data:', err);
-      }
-    }
-  };
-
   const getXpNeededForLevel = (lvl) => {
     return lvl * 100;
   };
 
-  const gainXP = (amount, reason) => {
-    const { level: curLvl, xp: curXp, streak: curStrk, unlockedAchievements: curAchs } = stateRef.current;
-
-    let newLevel = curLvl;
-    let newXp = curXp + amount;
-    let nextXpNeeded = getXpNeededForLevel(newLevel);
-    let leveledUp = false;
-
-    while (newXp >= nextXpNeeded && newLevel < 8) {
-      newXp -= nextXpNeeded;
-      newLevel += 1;
-      nextXpNeeded = getXpNeededForLevel(newLevel);
-      leveledUp = true;
-    }
-
-    // Sync reference
-    stateRef.current = {
-      level: newLevel,
-      xp: newXp,
-      streak: curStrk,
-      unlockedAchievements: curAchs
-    };
-
-    // Update states
-    setXp(newXp);
-    if (leveledUp) {
-      setLevel(newLevel);
-      setLevelUpData({
-        level: newLevel,
-        title: LEVEL_TITLES[newLevel],
-        reward: newLevel === 8 ? 'Campus Legend Badge Unlocked!' : 'Double views boost on listings'
+  const gainXP = async (amount, reason) => {
+    if (!user) return;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const currentXp = xp;
+      const currentLvl = level;
+      
+      let nextLvl = currentLvl;
+      let nextXp = currentXp + amount;
+      let nextXpNeeded = getXpNeededForLevel(nextLvl);
+      let leveledUp = false;
+      
+      while (nextXp >= nextXpNeeded && nextLvl < 8) {
+        nextXp -= nextXpNeeded;
+        nextLvl += 1;
+        nextXpNeeded = getXpNeededForLevel(nextLvl);
+        leveledUp = true;
+      }
+      
+      // Update states
+      setXp(nextXp);
+      if (leveledUp) {
+        setLevel(nextLvl);
+        setLevelUpData({
+          level: nextLvl,
+          title: LEVEL_TITLES[nextLvl],
+          reward: nextLvl === 8 ? 'Campus Legend Badge Unlocked!' : 'Double views boost on listings'
+        });
+        toast.success(`🎉 Level Up! You are now Level ${nextLvl}: ${LEVEL_TITLES[nextLvl]}`);
+      }
+      
+      // Save to Firestore user doc
+      await updateDoc(userRef, {
+        xp: nextXp,
+        level: nextLvl
       });
+      
+      // Save to xpHistory collection
+      await addDoc(collection(db, 'xpHistory'), {
+        userId: user.uid,
+        amount,
+        reason,
+        createdAt: serverTimestamp()
+      });
+      
+      // Trigger toast
+      const toastId = Date.now() + Math.random();
+      setXpToasts(prev => [...prev, { id: toastId, amount, reason }]);
+      
+      setTimeout(() => {
+        setXpToasts(prev => prev.filter(t => t.id !== toastId));
+      }, 3500);
+      
+    } catch (err) {
+      console.error('Error gaining XP:', err);
     }
-
-    // Add to XP Toast queue
-    const toastId = Date.now() + Math.random();
-    setXpToasts(prev => [...prev, { id: toastId, amount, reason }]);
-
-    // Auto dismiss XP Toast
-    setTimeout(() => {
-      setXpToasts(prev => prev.filter(t => t.id !== toastId));
-    }, 3500);
-
-    saveState(newLevel, newXp, curStrk, curAchs);
   };
 
-  const unlockAchievement = (id) => {
-    const { level: curLvl, xp: curXp, streak: curStrk, unlockedAchievements: curAchs } = stateRef.current;
-    if (curAchs.includes(id)) return;
+  const unlockAchievement = async (id) => {
+    if (!user) return;
+    const currentAchs = unlockedAchievements || [];
+    if (currentAchs.includes(id)) return;
     
     const ach = ACHIEVEMENTS_LIST.find(a => a.id === id);
     if (!ach) return;
+    
+    const newAchs = [...currentAchs, id];
+    setUnlockedAchievements(newAchs);
+    
+    try {
+      // Save to Firestore user doc
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        achievements: newAchs
+      });
+      
+      // Save to userBadges collection
+      await addDoc(collection(db, 'userBadges'), {
+        userId: user.uid,
+        badgeId: id,
+        title: ach.title,
+        badgeEmoji: ach.badge,
+        unlockedAt: serverTimestamp(),
+        xpEarned: ach.xp
+      });
+      
+      // Gain XP
+      await gainXP(ach.xp, `Achievement: ${ach.title}`);
+      
+      // Display achievement notification popup
+      toast.success(`🏆 Achievement Unlocked: ${ach.title} (+${ach.xp} XP)`);
+    } catch (err) {
+      console.error('Error unlocking achievement:', err);
+    }
+  };
 
-    const nextAch = [...curAchs, id];
-    stateRef.current.unlockedAchievements = nextAch;
-    setUnlockedAchievements(nextAch);
-
-    gainXP(ach.xp, `Achievement: ${ach.title}`);
+  const triggerDailyLogin = async (usrId, currentData) => {
+    try {
+      const todayStr = new Date().toDateString();
+      const lastActiveStr = currentData.lastActiveDate;
+      
+      if (lastActiveStr === todayStr) return; // Already logged in today
+      
+      const userRef = doc(db, 'users', usrId);
+      let newStreak = currentData.streak || 0;
+      let newLongest = currentData.longestStreak || 0;
+      
+      if (lastActiveStr) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toDateString();
+        
+        if (lastActiveStr === yesterdayStr) {
+          newStreak += 1;
+        } else {
+          newStreak = 1;
+        }
+      } else {
+        newStreak = 1;
+      }
+      
+      if (newStreak > newLongest) {
+        newLongest = newStreak;
+      }
+      
+      // Award 5 XP for login
+      let loginXp = 5;
+      let reason = 'Daily Login';
+      
+      if (newStreak % 7 === 0) {
+        loginXp += 50; // +50 XP bonus for weekly streak
+        reason = `${newStreak} Day Streak Bonus!`;
+        toast.success(`🔥 ${newStreak} Day Streak Bonus! +50 XP`);
+      }
+      
+      // Perform state updates and save to firestore
+      const currentXp = currentData.xp || 0;
+      const currentLvl = currentData.level || 1;
+      
+      let nextLvl = currentLvl;
+      let nextXp = currentXp + loginXp;
+      let nextXpNeeded = getXpNeededForLevel(nextLvl);
+      let leveledUp = false;
+      
+      while (nextXp >= nextXpNeeded && nextLvl < 8) {
+        nextXp -= nextXpNeeded;
+        nextLvl += 1;
+        nextXpNeeded = getXpNeededForLevel(nextLvl);
+        leveledUp = true;
+      }
+      
+      await updateDoc(userRef, {
+        streak: newStreak,
+        longestStreak: newLongest,
+        lastActiveDate: todayStr,
+        xp: nextXp,
+        level: nextLvl
+      });
+      
+      setLevel(nextLvl);
+      setXp(nextXp);
+      setStreak(newStreak);
+      
+      // Log in xpHistory
+      await addDoc(collection(db, 'xpHistory'), {
+        userId: usrId,
+        amount: loginXp,
+        reason,
+        createdAt: serverTimestamp()
+      });
+      
+      if (leveledUp) {
+        toast.success(`🎉 Level Up! You are now Level ${nextLvl}: ${LEVEL_TITLES[nextLvl]}`);
+      }
+    } catch (err) {
+      console.error('Error triggering daily login:', err);
+    }
   };
 
   const completeOnboarding = (startTour) => {
@@ -152,86 +250,42 @@ export function GamificationProvider({ children }) {
     setActiveTourStep(null);
   };
 
-  const triggerDailyLoginInternal = (initLevel, initXp, initStreak, initAchievements) => {
-    const lastLogin = localStorage.getItem('sv_last_login');
-    const today = new Date().toDateString();
-    
-    if (lastLogin !== today) {
-      localStorage.setItem('sv_last_login', today);
-      
-      // Calculate streak
-      let newStreak = initStreak;
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      if (lastLogin === yesterday.toDateString()) {
-        newStreak = initStreak + 1;
-      } else {
-        newStreak = 1;
-      }
-      
-      stateRef.current.streak = newStreak;
-      setStreak(newStreak);
-      localStorage.setItem('sv_streak', newStreak.toString());
-
-      // Gain daily login XP
-      gainXP(5, 'Daily Login Reward');
-      
-      if (newStreak % 7 === 0) {
-        gainXP(50, `${newStreak} Day Streak Bonus!`);
-      }
-    }
-  };
-
-  // Initialize from LocalStorage first, then sync with Firestore when userData loads
+  // Initialize onboarding state
   useEffect(() => {
-    const savedLevel = localStorage.getItem('sv_level');
-    const savedXp = localStorage.getItem('sv_xp');
-    const savedStreak = localStorage.getItem('sv_streak');
-    const savedAchievements = localStorage.getItem('sv_achievements');
     const savedOnboarding = localStorage.getItem('sv_onboarding_done');
-
-    let lvl = savedLevel ? parseInt(savedLevel) : 1;
-    let points = savedXp ? parseInt(savedXp) : 0;
-    let strk = savedStreak ? parseInt(savedStreak) : 1;
-    let achs = savedAchievements ? JSON.parse(savedAchievements) : [];
-
-    stateRef.current = { level: lvl, xp: points, streak: strk, unlockedAchievements: achs };
-
-    setLevel(lvl);
-    setXp(points);
-    setStreak(strk);
-    setUnlockedAchievements(achs);
-    
     if (!savedOnboarding) {
       setShowOnboarding(true);
     }
-
-    triggerDailyLoginInternal(lvl, points, strk, achs);
   }, []);
 
-  // Listen to Firestore userData updates
+  // Listen to Firestore userData updates & trigger daily login
   useEffect(() => {
     if (userData && !initializedRef.current) {
-      const lvl = userData.level !== undefined ? userData.level : stateRef.current.level;
-      const points = userData.xp !== undefined ? userData.xp : stateRef.current.xp;
-      const strk = userData.streak !== undefined ? userData.streak : stateRef.current.streak;
-      const achs = userData.achievements !== undefined ? userData.achievements : stateRef.current.unlockedAchievements;
+      const lvl = userData.level || 1;
+      const points = userData.xp || 0;
+      const strk = userData.streak || 0;
+      const achs = userData.achievements || [];
 
       setLevel(lvl);
       setXp(points);
       setStreak(strk);
       setUnlockedAchievements(achs);
 
-      stateRef.current = { level: lvl, xp: points, streak: strk, unlockedAchievements: achs };
       initializedRef.current = true;
+      
+      // Trigger daily login check
+      triggerDailyLogin(user.uid, userData);
     }
-  }, [userData]);
+  }, [userData, user]);
 
   // Reset initialization ref on sign out
   useEffect(() => {
     if (!user) {
       initializedRef.current = false;
+      setLevel(1);
+      setXp(0);
+      setStreak(0);
+      setUnlockedAchievements([]);
     }
   }, [user]);
 

@@ -14,11 +14,12 @@ import {
 const CATEGORIES = [
   { name: 'Books', emoji: '📚', desc: 'Textbooks & PYQs' },
   { name: 'Electronics', emoji: '💻', desc: 'Laptops, calculators' },
+  { name: 'Gadgets', emoji: '🔌', desc: 'Power banks, IoT, chargers' },
+  { name: 'Cycles', emoji: '🚲', desc: 'Bicycles & accessories' },
+  { name: 'Hostel Essentials', emoji: '🧹', desc: 'Mattresses, buckets, locks' },
   { name: 'Lab Equipment', emoji: '🧪', desc: 'Aprons, drafters, kits' },
-  { name: 'Stationery', emoji: '✏️', desc: 'Pens, notebooks, files' },
-  { name: 'Sports', emoji: '🏀', desc: 'Rackets, balls, gear' },
-  { name: 'Furniture', emoji: '🪑', desc: 'Hostel tables, chairs' },
-  { name: 'Clothing', emoji: '👕', desc: 'College hoodies, formals' },
+  { name: 'Stationery', emoji: '✏️', desc: 'Pens, notebooks, registers' },
+  { name: 'Notes', emoji: '📝', desc: 'Handwritten & print notes' },
   { name: 'Other', emoji: '📦', desc: 'Miscellaneous items' }
 ];
 
@@ -41,7 +42,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // Fetch listings
-    const listingsQuery = query(collection(db, 'marketplace'), orderBy('createdAt', 'desc'));
+    const listingsQuery = query(collection(db, 'listings'), orderBy('createdAt', 'desc'));
     const unsubListings = onSnapshot(listingsQuery, (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setListings(items);

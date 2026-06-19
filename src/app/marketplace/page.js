@@ -14,7 +14,7 @@ import {
   RotateCcw, Sparkles, AlertCircle, ShoppingCart, Plus 
 } from 'lucide-react';
 
-const CATEGORIES = ['All', 'Books', 'Electronics', 'Lab Equipment', 'Stationery', 'Sports', 'Furniture', 'Clothing', 'Other'];
+const CATEGORIES = ['All', 'Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
 const LISTING_TYPES = ['All Types', 'Sell', 'Rent', 'Donate', 'Exchange'];
 const CONDITIONS = ['All', 'New', 'Like New', 'Good', 'Fair', 'Poor'];
 const LOCATIONS = ['All', 'Hostel', 'Campus', 'Outside Campus'];
@@ -63,7 +63,7 @@ function MarketplaceContent() {
 
   // Fetch Listings
   useEffect(() => {
-    const q = query(collection(db, 'marketplace'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'listings'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setListings(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
