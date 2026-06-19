@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { uploadFile } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -30,9 +30,7 @@ function UploadNotesContent() {
     if (!form.title || !form.subject || !file) return toast.error('Title, subject and file are required.');
     setLoading(true);
     try {
-      const fileRef = ref(storage, `notes/${user.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(fileRef, file);
-      const fileUrl = await getDownloadURL(fileRef);
+      const fileUrl = await uploadFile(file, 'auto');
       await addDoc(collection(db, 'notes'), {
         ...form, semester: form.semester || 'N/A',
         fileUrl, fileName: file.name, fileSize: file.size,

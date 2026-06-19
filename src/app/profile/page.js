@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { uploadImage } from '@/lib/cloudinary';
 import { useGamification } from '@/context/GamificationContext';
 import { useSearchParams } from 'next/navigation';
 import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -60,6 +61,8 @@ function ProfileContent() {
   
   const [activeTab, setActiveTab] = useState('Listings');
   const [saving, setSaving] = useState(false);
+  const [profilePicProgress, setProfilePicProgress] = useState(0);
+  const [uploadingPic, setUploadingPic] = useState(false);
 
   // Live User Data states
   const [userListings, setUserListings] = useState([]);
@@ -174,6 +177,7 @@ function ProfileContent() {
     github: '',
     linkedin: '',
     resume: '',
+    profilePicture: '',
     notificationPreferences: { globalMute: false, mutedCategories: [] },
   });
 
@@ -189,6 +193,7 @@ function ProfileContent() {
         github: userData.github || '',
         linkedin: userData.linkedin || '',
         resume: userData.resume || '',
+        profilePicture: userData.profilePicture || '',
         notificationPreferences: userData.notificationPreferences || { globalMute: false, mutedCategories: [] },
       });
     }
@@ -207,6 +212,7 @@ function ProfileContent() {
         github: form.github,
         linkedin: form.linkedin,
         resume: form.resume,
+        profilePicture: form.profilePicture,
         notificationPreferences: form.notificationPreferences,
       });
       await refreshUserData();
@@ -294,9 +300,14 @@ function ProfileContent() {
                   width: 60, height: 60, borderRadius: '50%', background: 'var(--gradient-primary)', 
                   display: 'flex', alignItems: 'center', justifyContent: 'center', 
                   fontSize: 'var(--fs-xl)', fontWeight: 'var(--fw-bold)', color: '#fff',
-                  border: '2px solid var(--border-color)', boxShadow: 'var(--shadow-sm)'
+                  border: '2px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
+                  overflow: 'hidden'
                 }}>
-                  {getInitials(userData?.displayName)}
+                  {userData?.profilePicture ? (
+                    <img src={userData.profilePicture} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                  ) : (
+                    getInitials(userData?.displayName)
+                  )}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 'var(--fw-bold)', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -453,7 +464,18 @@ function ProfileContent() {
                 {activeTab === 'Wishlist' && <WishlistTab items={wishlistItems} />}
                 {activeTab === 'Reviews' && <ReviewsTab reviews={userReviews} rating={sellerRating} />}
                 {activeTab === 'Activity' && <ActivityTab activity={userActivity} />}
-                {activeTab === 'Settings' && <SettingsTab form={form} setForm={setForm} handleSave={handleSave} saving={saving} />}
+                {activeTab === 'Settings' && (
+                  <SettingsTab 
+                    form={form} 
+                    setForm={setForm} 
+                    handleSave={handleSave} 
+                    saving={saving} 
+                    profilePicProgress={profilePicProgress}
+                    setProfilePicProgress={setProfilePicProgress}
+                    uploadingPic={uploadingPic}
+                    setUploadingPic={setUploadingPic}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
 
@@ -759,12 +781,92 @@ function ActivityTab({ activity }) {
 }
 
 // --- SETTINGS TAB ---
-function SettingsTab({ form, setForm, handleSave, saving }) {
+function SettingsTab({ 
+  form, setForm, handleSave, saving, 
+  profilePicProgress, setProfilePicProgress, 
+  uploadingPic, setUploadingPic 
+}) {
+  const toast = useToast();
+
+  const handlePicChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      return toast.error('Invalid image type. Please select a JPG, PNG, or WEBP image.');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return toast.error('Image size must be less than 10MB.');
+    }
+
+    setUploadingPic(true);
+    setProfilePicProgress(0);
+    try {
+      const url = await uploadImage(file, (progress) => {
+        setProfilePicProgress(progress);
+      });
+      setForm(prev => ({ ...prev, profilePicture: url }));
+      toast.success('Profile photo uploaded! Click save to apply changes.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload photo.');
+    } finally {
+      setUploadingPic(false);
+    }
+  };
+
   return (
     <div className="card-glass flex-col gap-4">
       <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', margin: 0 }}>
         Edit Trading Profile
       </h3>
+      
+      {/* Profile Picture Upload Section */}
+      <div className="form-group" style={{ marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <label className="form-label">Profile Photo</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ 
+            width: 64, height: 64, borderRadius: '50%', background: 'var(--gradient-primary)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)', color: '#fff',
+            border: '2px solid var(--border-color)', boxShadow: 'var(--shadow-sm)',
+            overflow: 'hidden', flexShrink: 0
+          }}>
+            {form.profilePicture ? (
+              <img src={form.profilePicture} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Preview" />
+            ) : (
+              '?'
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <input 
+              type="file" 
+              accept="image/*" 
+              id="profile-pic-input" 
+              style={{ display: 'none' }} 
+              onChange={handlePicChange} 
+              disabled={uploadingPic}
+            />
+            <button 
+              type="button" 
+              className="btn btn-secondary btn-sm" 
+              onClick={() => document.getElementById('profile-pic-input').click()}
+              disabled={uploadingPic}
+              style={{ gap: '6px' }}
+            >
+              {uploadingPic ? `Uploading (${profilePicProgress}%)` : 'Choose New Photo'}
+            </button>
+            {uploadingPic && (
+              <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginTop: '8px' }}>
+                <div style={{ width: `${profilePicProgress}%`, height: '100%', background: 'var(--accent-primary)', transition: 'width 0.2s ease-out' }} />
+              </div>
+            )}
+            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+              Supports JPG, PNG, WEBP up to 10MB
+            </p>
+          </div>
+        </div>
+      </div>
       
       <div className="form-group" style={{ marginBottom: 0 }}>
         <label className="form-label">Display Name</label>

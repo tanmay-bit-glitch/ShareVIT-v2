@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, limit, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
-import { db, storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '@/lib/firebase';
+import { uploadImage } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useGamification } from '@/context/GamificationContext';
@@ -49,6 +49,7 @@ function ChatContent() {
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [activeItem, setActiveItem] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [chatUploadProgress, setChatUploadProgress] = useState(0);
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -130,16 +131,22 @@ function ChatContent() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB.');
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Invalid image type. Please select a JPG, PNG, or WEBP image.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size must be less than 10MB.');
       return;
     }
 
     setUploading(true);
+    setChatUploadProgress(0);
     try {
-      const storageRef = ref(storage, `chats/${room.id}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const downloadURL = await uploadImage(file, (progress) => {
+        setChatUploadProgress(progress);
+      });
 
       await addDoc(collection(db, room.col), {
         text: '',
@@ -152,7 +159,7 @@ function ChatContent() {
       toast.success('Image sent!');
     } catch (err) {
       console.error('Error uploading image:', err);
-      toast.error('Failed to upload image.');
+      toast.error(err.message || 'Failed to upload image.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -547,7 +554,7 @@ function ChatContent() {
               </button>
 
               <input
-                placeholder={uploading ? "Uploading image..." : `Message #${room.label}`}
+                placeholder={uploading ? `Uploading image (${chatUploadProgress}%)...` : `Message #${room.label}`}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 disabled={sending || uploading}

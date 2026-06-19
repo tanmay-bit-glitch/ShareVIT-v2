@@ -3,8 +3,8 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { uploadImage, uploadPDF } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -68,6 +68,8 @@ function CreateListingContent() {
   
   const [pdfFile, setPdfFile] = useState(null);
   const [pdfName, setPdfName] = useState('');
+  const [imageProgress, setImageProgress] = useState(0);
+  const [pdfProgress, setPdfProgress] = useState(0);
 
   // Sync Category from search parameters
   useEffect(() => {
@@ -98,8 +100,12 @@ function CreateListingContent() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        return toast.error('Image size must be less than 5MB.');
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        return toast.error('Invalid image type. Please select a JPG, PNG, or WEBP image.');
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return toast.error('Image size must be less than 10MB.');
       }
       setImage(file);
       setPreview(URL.createObjectURL(file));
@@ -113,8 +119,8 @@ function CreateListingContent() {
       if (file.type !== 'application/pdf') {
         return toast.error('Please upload a PDF file.');
       }
-      if (file.size > 15 * 1024 * 1024) {
-        return toast.error('PDF file size must be less than 15MB.');
+      if (file.size > 20 * 1024 * 1024) {
+        return toast.error('PDF file size must be less than 20MB.');
       }
       setPdfFile(file);
       setPdfName(file.name);
@@ -182,16 +188,16 @@ function CreateListingContent() {
     try {
       let imageUrl = '';
       if (image) {
-        const imageRef = ref(storage, `marketplace/${user.uid}/${Date.now()}_${image.name}`);
-        await uploadBytes(imageRef, image);
-        imageUrl = await getDownloadURL(imageRef);
+        imageUrl = await uploadImage(image, (progress) => {
+          setImageProgress(progress);
+        });
       }
 
       let pdfUrl = '';
       if (pdfFile) {
-        const pdfRef = ref(storage, `listings_files/${user.uid}/${Date.now()}_${pdfFile.name}`);
-        await uploadBytes(pdfRef, pdfFile);
-        pdfUrl = await getDownloadURL(pdfRef);
+        pdfUrl = await uploadPDF(pdfFile, (progress) => {
+          setPdfProgress(progress);
+        });
       }
 
       const listingData = {
@@ -247,8 +253,8 @@ function CreateListingContent() {
       const categoryRoute = form.category.toLowerCase().replace(' ', '-');
       router.push(`/marketplace/${categoryRoute}`);
     } catch (err) {
-      console.error(err);
-      toast.error('Failed to publish listing.');
+      console.error('Publishing error details:', err);
+      toast.error('Failed to publish listing: ' + (err.message || 'Check console logs.'));
     } finally {
       setLoading(false);
     }
@@ -708,6 +714,39 @@ function CreateListingContent() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(59, 130, 246, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '13px' }}>
                     <FileText size={16} style={{ color: 'var(--accent-primary)' }} />
                     <span style={{ color: '#93c5fd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Attached PDF: {pdfName}</span>
+                  </div>
+                )}
+
+                {/* Cloudinary Upload Progress Indicators */}
+                {loading && (
+                  <div style={{ padding: '16px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="spinner spinner-sm" style={{ width: 14, height: 14 }} /> Uploading Assets to Cloudinary...
+                    </h4>
+                    
+                    {image && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>
+                          <span>Image Upload</span>
+                          <span>{imageProgress}%</span>
+                        </div>
+                        <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${imageProgress}%`, height: '100%', background: 'var(--accent-primary)', transition: 'width 0.2s ease-out' }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {pdfFile && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>
+                          <span>PDF Document Upload</span>
+                          <span>{pdfProgress}%</span>
+                        </div>
+                        <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${pdfProgress}%`, height: '100%', background: 'var(--accent-success)', transition: 'width 0.2s ease-out' }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
