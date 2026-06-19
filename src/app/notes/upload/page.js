@@ -8,6 +8,7 @@ import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { notifyGroup } from '@/lib/notifications';
 
 const noteTypes = ['Notes', 'PYQ', 'Syllabus', 'Reference Material'];
 const departments = ['Computer Engineering', 'IT', 'AI & DS', 'Electronics', 'Mechanical', 'Civil', 'Chemical', 'Instrumentation'];
@@ -39,6 +40,19 @@ function UploadNotesContent() {
         downloads: 0, createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1), reputation: increment(5) });
+      
+      // Smart Notification Trigger
+      if (form.department) {
+        await notifyGroup(
+          `New ${form.type} Uploaded!`,
+          `${userData?.displayName || 'Someone'} uploaded "${form.title}" for ${form.subject}.`,
+          'Academic',
+          { department: form.department },
+          { itemId: form.title },
+          user.uid
+        );
+      }
+
       toast.success('Notes uploaded! +5 reputation');
       router.push('/notes');
     } catch (err) {

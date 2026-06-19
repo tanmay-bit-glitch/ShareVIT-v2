@@ -1,7 +1,6 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ClientLayout from "./ClientLayout";
-import Script from "next/script";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -20,10 +19,6 @@ export default function RootLayout({ children }) {
     <html lang="en" data-theme="dark" className={inter.variable} data-scroll-behavior="smooth">
       <body>
         <ClientLayout>{children}</ClientLayout>
-        <Script 
-          src={`https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}`}
-          strategy="beforeInteractive"
-        />
       </body>
     </html>
   );

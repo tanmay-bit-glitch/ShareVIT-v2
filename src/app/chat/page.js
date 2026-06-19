@@ -23,7 +23,7 @@ function ChatContent() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [channelsOpen, setChannelsOpen] = useState(false);
+  const [channelsOpen, setChannelsOpen] = useState(true);
   const { user, userData } = useAuth();
   const bottomRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -80,7 +80,7 @@ function ChatContent() {
           background: '#111827',
           border: '1px solid rgba(255,255,255,0.05)',
           borderRadius: '24px',
-          display: 'flex',
+          display: channelsOpen ? 'flex' : 'none',
           flexDirection: 'column',
           padding: '24px 16px',
           gap: '20px',
@@ -93,7 +93,7 @@ function ChatContent() {
               <MessagesSquare size={18} style={{ color: 'var(--accent-primary)' }} />
               <span>ShareVIT Server</span>
             </h3>
-            <button className="hide-tablet-up" onClick={() => setChannelsOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
+            <button className="navbar-hamburger" onClick={() => setChannelsOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
               <X size={20} />
             </button>
           </div>
@@ -138,7 +138,9 @@ function ChatContent() {
         {/* Chat Message Pane */}
         <div style={{
           flex: 1,
-          background: '#111827',
+          background: 'rgba(15, 23, 41, 0.6)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid rgba(255,255,255,0.05)',
           borderRadius: '24px',
           display: 'flex',
@@ -149,7 +151,7 @@ function ChatContent() {
         }}>
           {/* Header */}
           <div style={{ padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button className="navbar-hamburger hide-tablet-up" onClick={() => setChannelsOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
+            <button className="navbar-hamburger" onClick={() => setChannelsOpen(!channelsOpen)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
               <Menu size={20} />
             </button>
             <Hash size={22} style={{ color: 'var(--accent-primary)' }} />
@@ -163,7 +165,7 @@ function ChatContent() {
           </div>
 
           {/* Messages */}
-          <div className="chat-messages" style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
+          <div className="chat-messages" style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
             {messages.length === 0 && (
               <div className="empty-state" style={{ padding: '32px', color: '#94a3b8', textAlign: 'center' }}>
                 <p>Welcome to #{room.label}! This is the start of the channel. 👋</p>
@@ -183,7 +185,7 @@ function ChatContent() {
               const initial = senderName.charAt(0).toUpperCase();
 
               return (
-                <div key={msg.id} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: '16px', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                <div key={msg.id} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: '10px', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
                   {/* Avatar */}
                   <div style={{
                     width: '36px',
@@ -212,7 +214,7 @@ function ChatContent() {
                     
                     {/* Bubble */}
                     <div style={{
-                      padding: '14px 18px',
+                      padding: '10px 14px',
                       borderRadius: '16px',
                       fontSize: '14.5px',
                       background: isUser ? '#6366f1' : '#1e293b',

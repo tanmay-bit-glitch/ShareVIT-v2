@@ -3,22 +3,21 @@
 import Link from 'next/link';
 
 const footerLinks = {
-  Features: [
-    { href: '/marketplace', label: 'Marketplace' },
-    { href: '/notes', label: 'Notes & PYQs' },
-    { href: '/assignments', label: 'Assignments' },
-    { href: '/requests', label: 'Requests' },
+  Marketplace: [
+    { href: '/marketplace', label: 'Browse Listings' },
+    { href: '/marketplace/create', label: 'Create Listing' },
+    { href: '/requests', label: 'Student Requests' },
+    { href: '/profile?tab=wishlist', label: 'Active Wishlist' },
   ],
-  Tools: [
-    { href: '/tools/gpa-calculator', label: 'GPA Calculator' },
-    { href: '/tools/attendance', label: 'Attendance Tracker' },
-    { href: '/tools/timetable', label: 'Timetable Builder' },
-    { href: '/tools/deadline-tracker', label: 'Deadline Tracker' },
-  ],
-  More: [
-    { href: '/ai-assistant', label: 'AI Assistant' },
+  Community: [
+    { href: '/leaderboard', label: 'Leaderboard' },
+    { href: '/academics', label: 'Gamification & XP' },
     { href: '/chat', label: 'Student Chat' },
-    { href: '/profile', label: 'Profile' },
+  ],
+  Support: [
+    { href: '/ai-assistant', label: 'AI Assistant' },
+    { href: '/academics', label: 'Help Center' },
+    { href: 'mailto:support@sharevit.com', label: 'Report Issue' },
   ],
 };
 

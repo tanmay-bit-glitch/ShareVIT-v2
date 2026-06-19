@@ -170,8 +170,16 @@ function AIContent() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 1024);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setMessages([{ role: 'assistant', content: activeMode.intro, typing: false }]);
@@ -231,15 +239,15 @@ function AIContent() {
   };
 
   return (
-    <div className="page-content" style={{ padding: 'var(--space-6)', height: 'calc(100vh - var(--navbar-height))', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0b0f19' }}>
+    <div className="page-content" style={{ padding: 'clamp(var(--space-2), 3vw, var(--space-6))', height: 'calc(100vh - var(--navbar-height))', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0b0f19' }}>
       
       {/* Main Grid Wrapper */}
       <div style={{
         width: '100%',
         maxWidth: '1200px',
         display: 'flex',
-        gap: '24px',
-        height: '85vh',
+        gap: 'clamp(12px, 2vw, 24px)',
+        height: isMobile ? 'calc(100vh - var(--navbar-height) - 32px)' : '85vh',
         position: 'relative'
       }}>
         
@@ -249,19 +257,23 @@ function AIContent() {
           background: '#111827',
           border: '1px solid rgba(255,255,255,0.05)',
           borderRadius: '24px',
-          display: 'flex',
+          display: sidebarOpen ? 'flex' : 'none',
           flexDirection: 'column',
           padding: '24px 16px',
           gap: '16px',
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          transition: 'transform 0.3s ease-in-out',
+          transition: 'all 0.3s ease-in-out',
+          position: isMobile ? 'absolute' : 'relative',
+          height: '100%',
+          zIndex: isMobile ? 50 : 1,
+          transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-150%)') : 'none',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={16} style={{ color: 'var(--accent-primary)' }} />
               <span>Select Assistant Mode</span>
             </h3>
-            <button className="hide-tablet-up" onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
+            <button className="navbar-hamburger" onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
               <X size={20} />
             </button>
           </div>
@@ -306,19 +318,22 @@ function AIContent() {
         {/* Chat Container */}
         <div style={{
           flex: 1,
-          background: '#111827',
+          background: 'rgba(15, 23, 41, 0.6)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid rgba(255,255,255,0.05)',
           borderRadius: '24px',
           display: 'flex',
           flexDirection: 'column',
           height: '100%',
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          width: isMobile ? '100%' : 'auto'
         }}>
           {/* Header */}
-          <div style={{ padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: 'clamp(12px, 3vw, 20px) clamp(16px, 4vw, 32px)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button className="navbar-hamburger hide-tablet-up" onClick={() => setSidebarOpen(true)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
+              <button className="navbar-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px', display: 'flex', marginRight: '4px' }}>
                 <Menu size={20} />
               </button>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }} />
@@ -338,11 +353,11 @@ function AIContent() {
           </div>
 
           {/* Messages list */}
-          <div className="chat-messages" style={{ flex: 1, padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
+          <div className="chat-messages" style={{ flex: 1, padding: 'clamp(16px, 4vw, 24px)', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
             {messages.map((msg, i) => {
               const isUser = msg.role === 'user';
               return (
-                <div key={i} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: '16px', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                <div key={i} style={{ display: 'flex', alignSelf: isUser ? 'flex-end' : 'flex-start', gap: '10px', maxWidth: '85%', flexDirection: isUser ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
                   {/* Avatar */}
                   <div style={{
                     width: '36px',
@@ -361,7 +376,7 @@ function AIContent() {
 
                   {/* Bubble */}
                   <div style={{
-                    padding: '16px 20px',
+                    padding: '10px 14px',
                     borderRadius: '16px',
                     fontSize: '14.5px',
                     lineHeight: '1.6',
@@ -389,7 +404,7 @@ function AIContent() {
             
             {/* Suggested Prompts Render */}
             {messages.length === 1 && (
-              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: '16px', maxWidth: '85%', flexDirection: 'row', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: '10px', maxWidth: '85%', flexDirection: 'row', alignItems: 'flex-start' }}>
                 <div style={{ width: '36px', flexShrink: 0 }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontWeight: 'var(--fw-semibold)', margin: '4px 0' }}>Suggested starting points:</p>
@@ -432,7 +447,7 @@ function AIContent() {
             )}
             
             {loading && (
-              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: '16px', maxWidth: '85%', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignSelf: 'flex-start', gap: '10px', maxWidth: '85%', alignItems: 'flex-start' }}>
                 <div style={{
                   width: '36px',
                   height: '36px',
@@ -457,8 +472,8 @@ function AIContent() {
           </div>
 
           {/* Input Bar */}
-          <div style={{ padding: '20px 32px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <form onSubmit={handleSend} style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ padding: 'clamp(12px, 3vw, 20px) clamp(16px, 4vw, 32px)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <form onSubmit={handleSend} style={{ display: 'flex', gap: 'clamp(8px, 2vw, 16px)' }}>
               <input
                 placeholder={`Ask in ${activeMode.label} Mode...`}
                 value={input}
@@ -472,8 +487,9 @@ function AIContent() {
                   padding: '14px 20px',
                   color: '#f8fafc',
                   outline: 'none',
-                  fontSize: '14.5px',
-                  transition: 'all 0.3s ease'
+                  fontSize: 'clamp(13px, 3.5vw, 14.5px)',
+                  transition: 'all 0.3s ease',
+                  width: '100%'
                 }}
                 onFocus={e => {
                   e.target.style.borderColor = '#6366f1';
@@ -499,9 +515,9 @@ function AIContent() {
                   fontWeight: '500'
                 }}
               >
-                {loading ? '...' : (
+                  {loading ? '...' : (
                   <>
-                    <span>Send</span>
+                    <span style={{ display: isMobile ? 'none' : 'inline' }}>Send</span>
                     <Send size={16} strokeWidth={2} />
                   </>
                 )}

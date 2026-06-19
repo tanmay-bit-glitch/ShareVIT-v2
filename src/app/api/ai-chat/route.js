@@ -28,9 +28,9 @@ export async function POST(request) {
     if (!message) return NextResponse.json({ error: 'Message required' }, { status: 400 });
     const systemPrompt = MODE_PROMPTS[mode] || DEFAULT_SYSTEM_PROMPT;
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      systemInstruction: systemPrompt 
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.1-pro-preview',
+      systemInstruction: systemPrompt
     });
 
     const chatHistory = (history || []).map(msg => ({

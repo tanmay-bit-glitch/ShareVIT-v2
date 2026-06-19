@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { executeRecaptcha } from '@/lib/recaptcha';
 
-const departments = ['Computer Engineering', 'IT', 'AI & DS', 'Electronics', 'Mechanical', 'Civil', 'Chemical', 'Instrumentation'];
-const years = ['FE (1st Year)', 'SE (2nd Year)', 'TE (3rd Year)', 'BE (4th Year)'];
+import { ENGINEERING_BRANCHES, CAMPUSES } from '@/lib/constants';
+
+const years = ['FE (1st Year)', 'SE (2nd Year)', 'TE (3rd Year)', 'BE (4th Year)', 'ME/M.Tech'];
 
 export default function SignupPage() {
-  const [form, setForm] = useState({ displayName: '', email: '', password: '', confirmPassword: '', prn: '', department: '', year: '', phone: '' });
+  const [form, setForm] = useState({ displayName: '', email: '', password: '', confirmPassword: '', prn: '', campus: '', department: '', year: '', phone: '' });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const { signUp } = useAuth();
@@ -25,6 +25,7 @@ export default function SignupPage() {
     if (form.password.length < 6) errs.password = 'Password must be at least 6 characters';
     if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords do not match';
     if (!form.prn.match(/^\d{8,12}$/)) errs.prn = 'Enter a valid PRN (8-12 digits)';
+    if (!form.campus) errs.campus = 'Select your campus';
     if (!form.department) errs.department = 'Select your department';
     if (!form.year) errs.year = 'Select your year';
     setErrors(errs);
@@ -37,14 +38,11 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const recaptchaToken = await executeRecaptcha('signup');
-      if (recaptchaToken) {
-        await fetch('/api/verify-recaptcha', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: recaptchaToken }) });
-      }
 
       await signUp(form.email, form.password, {
         displayName: form.displayName,
         prn: form.prn,
+        campus: form.campus,
         department: form.department,
         year: form.year,
         phone: form.phone,
@@ -107,13 +105,23 @@ export default function SignupPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
             <div className="form-group">
+              <label className="form-label">Campus</label>
+              <select className="form-select" value={form.campus} onChange={handleChange('campus')}>
+                <option value="">Select Campus</option>
+                {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              {errors.campus && <p className="form-error">{errors.campus}</p>}
+            </div>
+            <div className="form-group">
               <label className="form-label">Department</label>
               <select className="form-select" value={form.department} onChange={handleChange('department')}>
-                <option value="">Select</option>
-                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                <option value="">Select Branch</option>
+                {ENGINEERING_BRANCHES.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               {errors.department && <p className="form-error">{errors.department}</p>}
             </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
             <div className="form-group">
               <label className="form-label">Year</label>
               <select className="form-select" value={form.year} onChange={handleChange('year')}>
