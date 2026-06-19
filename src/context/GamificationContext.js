@@ -1,6 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const GamificationContext = createContext();
 
@@ -27,6 +30,7 @@ const ACHIEVEMENTS_LIST = [
 ];
 
 export function GamificationProvider({ children }) {
+  const { user, userData } = useAuth();
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(0);
   const [streak, setStreak] = useState(1);
@@ -36,15 +40,30 @@ export function GamificationProvider({ children }) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTourStep, setActiveTourStep] = useState(null);
 
+  const initializedRef = useRef(false);
+
   // Sync ref to hold latest values immediately and avoid stale closures
   const stateRef = useRef({ level: 1, xp: 0, streak: 1, unlockedAchievements: [] });
 
   // Persistence helpers
-  const saveState = (l, x, s, ach) => {
+  const saveState = async (l, x, s, ach) => {
     localStorage.setItem('sv_level', l.toString());
     localStorage.setItem('sv_xp', x.toString());
     localStorage.setItem('sv_streak', s.toString());
     localStorage.setItem('sv_achievements', JSON.stringify(ach));
+
+    if (user) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          level: l,
+          xp: x,
+          streak: s,
+          achievements: ach
+        });
+      } catch (err) {
+        console.error('Error updating Firestore user gamification data:', err);
+      }
+    }
   };
 
   const getXpNeededForLevel = (lvl) => {
@@ -164,7 +183,7 @@ export function GamificationProvider({ children }) {
     }
   };
 
-  // Initialize from LocalStorage inside useEffect once component is mounted
+  // Initialize from LocalStorage first, then sync with Firestore when userData loads
   useEffect(() => {
     const savedLevel = localStorage.getItem('sv_level');
     const savedXp = localStorage.getItem('sv_xp');
@@ -190,6 +209,31 @@ export function GamificationProvider({ children }) {
 
     triggerDailyLoginInternal(lvl, points, strk, achs);
   }, []);
+
+  // Listen to Firestore userData updates
+  useEffect(() => {
+    if (userData && !initializedRef.current) {
+      const lvl = userData.level !== undefined ? userData.level : stateRef.current.level;
+      const points = userData.xp !== undefined ? userData.xp : stateRef.current.xp;
+      const strk = userData.streak !== undefined ? userData.streak : stateRef.current.streak;
+      const achs = userData.achievements !== undefined ? userData.achievements : stateRef.current.unlockedAchievements;
+
+      setLevel(lvl);
+      setXp(points);
+      setStreak(strk);
+      setUnlockedAchievements(achs);
+
+      stateRef.current = { level: lvl, xp: points, streak: strk, unlockedAchievements: achs };
+      initializedRef.current = true;
+    }
+  }, [userData]);
+
+  // Reset initialization ref on sign out
+  useEffect(() => {
+    if (!user) {
+      initializedRef.current = false;
+    }
+  }, [user]);
 
   return (
     <GamificationContext.Provider value={{

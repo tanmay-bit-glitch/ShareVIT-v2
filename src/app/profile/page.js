@@ -5,17 +5,18 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useGamification } from '@/context/GamificationContext';
 import { useSearchParams } from 'next/navigation';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import VerifiedBadge from '@/components/auth/VerifiedBadge';
 import { ENGINEERING_BRANCHES, CAMPUSES } from '@/lib/constants';
-import { NOTIFICATION_CATEGORIES } from '@/lib/notifications';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings, Award, Clock, ShoppingCart, Star, FileText,
-  MapPin, ShieldCheck, Heart, Package, UserCheck, Mail, Briefcase, Plus, MessageSquare, GraduationCap, ArrowUpRight, CheckCircle, Search, Edit3, Flame, Calendar, PlusCircle, Pin, Trash2, Eye, Bookmark, MessageCircle, AlertCircle, Share2, HelpCircle, Check
+  MapPin, ShieldCheck, Heart, Package, Mail, Briefcase, Plus, MessageSquare, 
+  ChevronUp, ChevronDown, Check, Trash2, Eye, Pin, Edit3, Flame
 } from 'lucide-react';
+import Link from 'next/link';
 
 const years = ['FE (1st Year)', 'SE (2nd Year)', 'TE (3rd Year)', 'BE (4th Year)', 'ME/M.Tech'];
 
@@ -34,32 +35,6 @@ const Linkedin = (props) => (
     <circle cx="4" cy="4" r="2" />
   </svg>
 );
-
-// --- DUMMY DATA FOR MARKETPLACE PORTFOLIO (V3) ---
-const INITIAL_DUMMY_DATA = {
-  trustScore: 100,
-  memberSince: "June 2026",
-  lastActive: "Just now",
-  sellerRating: 0.0,
-  buyerRating: 0.0,
-  transactions: 0,
-  repeatCustomers: 0,
-  analytics: {
-    posted: 0,
-    sold: 0,
-    rented: 0,
-    exchanged: 0,
-    views: 0,
-    saves: 0,
-    responseRate: 100,
-    responseTime: "N/A"
-  },
-  listings: [],
-  lookingFor: [],
-  wishlist: [],
-  reviews: [],
-  activity: []
-};
 
 export default function ProfilePage() {
   return (
@@ -85,7 +60,13 @@ function ProfileContent() {
   
   const [activeTab, setActiveTab] = useState('Listings');
   const [saving, setSaving] = useState(false);
-  const [dummyData, setDummyData] = useState(INITIAL_DUMMY_DATA);
+
+  // Live User Data states
+  const [userListings, setUserListings] = useState([]);
+  const [userRequests, setUserRequests] = useState([]);
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [userReviews, setUserReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Sync tab with URL search parameter "?tab="
   const searchParams = useSearchParams();
@@ -96,7 +77,6 @@ function ProfileContent() {
       const allowedTabs = ['Listings', 'Missions', 'Achievements', 'Looking For', 'Wishlist', 'Reviews', 'Activity', 'Settings'];
       let targetTab = tabParam.charAt(0).toUpperCase() + tabParam.slice(1).toLowerCase();
       
-      // Match specific multi-word tabs
       if (tabParam.toLowerCase() === 'lookingfor' || tabParam.toLowerCase() === 'looking-for') {
         targetTab = 'Looking For';
       }
@@ -107,13 +87,83 @@ function ProfileContent() {
     }
   }, [tabParam]);
 
-  // Active Missions State
-  const [missions, setMissions] = useState([
-    { id: 'mission_1', title: 'Post 3 Listings This Week', progress: 1, target: 3, xp: 50, claimed: false },
-    { id: 'mission_2', title: 'Verify Your Profile', progress: 0, target: 1, xp: 50, claimed: false },
-    { id: 'mission_3', title: 'Upload Better Listing Photos', progress: 0, target: 1, xp: 10, claimed: false }
-  ]);
-  
+  // Real Firestore Subscriptions
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Listings
+    const listingsQ = query(collection(db, 'marketplace'), where('sellerId', '==', user.uid));
+    const unsubListings = onSnapshot(listingsQ, (snap) => {
+      setUserListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+
+    // 2. Requests
+    const requestsQ = query(collection(db, 'requests'), where('requesterId', '==', user.uid));
+    const unsubRequests = onSnapshot(requestsQ, (snap) => {
+      setUserRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // 3. Wishlist IDs from LocalStorage
+    const savedIds = JSON.parse(localStorage.getItem('wishlist') || '[]');
+    if (savedIds.length > 0) {
+      const wishlistQ = query(collection(db, 'marketplace'));
+      const unsubWishlist = onSnapshot(wishlistQ, (snap) => {
+        const allItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setWishlistItems(allItems.filter(item => savedIds.includes(item.id)));
+      });
+      return () => {
+        unsubListings();
+        unsubRequests();
+        unsubWishlist();
+      };
+    } else {
+      setWishlistItems([]);
+    }
+
+    return () => {
+      unsubListings();
+      unsubRequests();
+    };
+  }, [user]);
+
+  // Fetch reviews (fallback to empty)
+  useEffect(() => {
+    if (!user) return;
+    const reviewsQ = query(collection(db, 'reviews'), where('sellerId', '==', user.uid));
+    const unsubReviews = onSnapshot(reviewsQ, (snap) => {
+      setUserReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubReviews();
+  }, [user]);
+
+  // Dynamic calculations for quests / missions
+  const listingsCount = userListings.length;
+  const isVerified = userData?.verified === true ? 1 : 0;
+  const hasPhotos = userListings.some(l => l.imageUrl) ? 1 : 0;
+
+  const currentMissions = [
+    { id: 'mission_1', title: 'Post 3 Listings on Campus', progress: Math.min(listingsCount, 3), target: 3, xp: 50 },
+    { id: 'mission_2', title: 'Verify Your Profile', progress: isVerified, target: 1, xp: 50 },
+    { id: 'mission_3', title: 'Upload Listing Photos', progress: hasPhotos, target: 1, xp: 10 }
+  ];
+
+  const userActivity = [];
+  userListings.forEach(l => {
+    userActivity.push({
+      id: `list_${l.id}`,
+      action: `You listed: "${l.title}" for ${l.listingType}`,
+      time: l.createdAt?.toDate ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(l.createdAt.toDate()) : 'Recently'
+    });
+  });
+  userRequests.forEach(r => {
+    userActivity.push({
+      id: `req_${r.id}`,
+      action: `You requested: "${r.title}"`,
+      time: r.createdAt?.toDate ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(r.createdAt.toDate()) : 'Recently'
+    });
+  });
+
   const [form, setForm] = useState({
     displayName: '',
     phone: '',
@@ -169,36 +219,46 @@ function ProfileContent() {
     }
   };
 
-  const togglePin = (id) => {
-    setDummyData(prev => ({
-      ...prev,
-      listings: prev.listings.map(l => l.id === id ? { ...l, pinned: !l.pinned } : l)
-    }));
-    toast.success('Listing pin status updated!');
-  };
-
-  const handleCompleteMission = (id) => {
-    setMissions(prev => prev.map(m => {
-      if (m.id === id) {
-        if (m.progress < m.target) {
-          const nextProg = m.progress + 1;
-          const isDone = nextProg === m.target;
-          if (isDone) {
-            gainXP(m.xp, `Completed Mission: ${m.title}`);
-          }
-          return { ...m, progress: nextProg };
-        }
-      }
-      return m;
-    }));
-  };
-
   const getInitials = (name) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
   const TABS = ['Listings', 'Missions', 'Achievements', 'Looking For', 'Wishlist', 'Reviews', 'Activity', 'Settings'];
+
+  // User Stats
+  const trustScore = userData?.trustScore; // Display only if exists in db
+  const sellerRating = userData?.rating;
+  const buyerRating = userData?.buyerRating;
+  const transactions = userListings.filter(l => l.status === 'Sold' || l.status === 'Rented').length;
+
+  // Automatically verify/unlock achievements based on database records
+  useEffect(() => {
+    if (!user || !userData) return;
+    
+    // Welcome/First Login
+    unlockAchievement('first_login');
+    
+    // First Listing
+    if (listingsCount >= 1) {
+      unlockAchievement('first_listing');
+    }
+    // First Purchase
+    if (userData.downloadsCount >= 1) {
+      unlockAchievement('first_purchase');
+    }
+    // Verified Student
+    if (userData.verified) {
+      unlockAchievement('verified_student');
+    }
+    // Successful sales
+    if (transactions >= 1) {
+      unlockAchievement('first_sale');
+    }
+    if (transactions >= 5) {
+      unlockAchievement('sales_5');
+    }
+  }, [listingsCount, transactions, userData, user]);
 
   return (
     <div className="page-content" style={{ padding: 'var(--space-6) 0 var(--space-16)' }}>
@@ -214,11 +274,17 @@ function ProfileContent() {
               
               {/* Trust Score Header Badge */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span className="badge badge-success" style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'bold' }}>
-                  <ShieldCheck size={12} /> {dummyData.trustScore}% Trust
-                </span>
+                {trustScore !== undefined ? (
+                  <span className="badge badge-success" style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'bold' }}>
+                    <ShieldCheck size={12} /> {trustScore}% Trust
+                  </span>
+                ) : (
+                  <span className="badge badge-secondary" style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'bold' }}>
+                    <ShieldCheck size={12} /> No Trust Score
+                  </span>
+                )}
                 <span className="badge badge-warning" style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: 'bold' }}>
-                  <Flame size={12} fill="currentColor" /> {streak} Day Streak
+                  <Flame size={12} fill={streak > 0 ? "currentColor" : "none"} /> {streak > 0 ? `${streak} Day Streak` : 'No Streak'}
                 </span>
               </div>
 
@@ -283,14 +349,14 @@ function ProfileContent() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Seller Rating</span>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', color: 'var(--accent-warning)' }}>
-                    <Star size={16} fill="currentColor" /> {dummyData.sellerRating}
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', color: sellerRating > 0 ? 'var(--accent-warning)' : 'var(--text-tertiary)' }}>
+                    <Star size={16} fill={sellerRating > 0 ? 'currentColor' : 'none'} /> {sellerRating > 0 ? sellerRating.toFixed(1) : 'N/A'}
                   </div>
                 </div>
                 <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Buyer Rating</span>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', color: 'var(--accent-info)' }}>
-                    <Star size={16} fill="currentColor" /> {dummyData.buyerRating}
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', color: buyerRating > 0 ? 'var(--accent-info)' : 'var(--text-tertiary)' }}>
+                    <Star size={16} fill={buyerRating > 0 ? 'currentColor' : 'none'} /> {buyerRating > 0 ? buyerRating.toFixed(1) : 'N/A'}
                   </div>
                 </div>
               </div>
@@ -298,15 +364,11 @@ function ProfileContent() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Successful Transactions</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{dummyData.transactions} completed</strong>
+                  <strong style={{ color: 'var(--text-primary)' }}>{transactions} completed</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Active Listings</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{dummyData.listings.filter(l => l.status === 'Available').length} items</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Repeat Customers</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{dummyData.repeatCustomers} students</strong>
+                  <strong style={{ color: 'var(--text-primary)' }}>{userListings.filter(l => l.status === 'active').length} items</strong>
                 </div>
               </div>
             </div>
@@ -320,30 +382,38 @@ function ProfileContent() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>Listings Sold</span>
-                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--accent-success)' }}>{dummyData.analytics.sold}</p>
+                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--accent-success)' }}>
+                    {userListings.filter(l => l.listingType === 'Sell' && l.status === 'Sold').length}
+                  </p>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>Listings Rented</span>
-                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--accent-primary)' }}>{dummyData.analytics.rented}</p>
+                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--accent-primary)' }}>
+                    {userListings.filter(l => l.listingType === 'Rent' && l.status === 'Rented').length}
+                  </p>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>Total Views</span>
-                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0' }}>{dummyData.analytics.views}</p>
+                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0' }}>
+                    {userListings.reduce((sum, l) => sum + (l.views || 0), 0)}
+                  </p>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-secondary)' }}>Saves / Wishlist</span>
-                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0' }}>{dummyData.analytics.saves}</p>
+                  <p style={{ fontSize: '16px', fontWeight: 'bold', margin: '2px 0 0' }}>
+                    {userListings.reduce((sum, l) => sum + (l.saves || 0), 0)}
+                  </p>
                 </div>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Response Rate</span>
-                  <span style={{ color: 'var(--accent-success)', fontWeight: 'bold' }}>{dummyData.analytics.responseRate}%</span>
+                  <span style={{ color: 'var(--accent-success)', fontWeight: 'bold' }}>{userData?.responseRate || 100}%</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'var(--text-secondary)' }}><Clock size={12} style={{ display: 'inline', marginRight: 4 }} /> Avg Response Time</span>
-                  <span>{dummyData.analytics.responseTime}</span>
+                  <span>{userData?.responseTime || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -376,13 +446,13 @@ function ProfileContent() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.15 }}
               >
-                {activeTab === 'Listings' && <ListingsTab listings={dummyData.listings} togglePin={togglePin} />}
-                {activeTab === 'Missions' && <MissionsTab missions={missions} handleCompleteMission={handleCompleteMission} />}
-                {activeTab === 'Achievements' && <AchievementsTab list={achievementsList} unlocked={unlockedAchievements} unlock={unlockAchievement} />}
-                {activeTab === 'Looking For' && <LookingForTab requests={dummyData.lookingFor} />}
-                {activeTab === 'Wishlist' && <WishlistTab items={dummyData.wishlist} />}
-                {activeTab === 'Reviews' && <ReviewsTab reviews={dummyData.reviews} rating={dummyData.sellerRating} count={32} />}
-                {activeTab === 'Activity' && <ActivityTab activity={dummyData.activity} />}
+                {activeTab === 'Listings' && <ListingsTab listings={userListings} />}
+                {activeTab === 'Missions' && <MissionsTab missions={currentMissions} />}
+                {activeTab === 'Achievements' && <AchievementsTab list={achievementsList} unlocked={unlockedAchievements} />}
+                {activeTab === 'Looking For' && <LookingForTab requests={userRequests} />}
+                {activeTab === 'Wishlist' && <WishlistTab items={wishlistItems} />}
+                {activeTab === 'Reviews' && <ReviewsTab reviews={userReviews} rating={sellerRating} />}
+                {activeTab === 'Activity' && <ActivityTab activity={userActivity} />}
                 {activeTab === 'Settings' && <SettingsTab form={form} setForm={setForm} handleSave={handleSave} saving={saving} />}
               </motion.div>
             </AnimatePresence>
@@ -392,30 +462,27 @@ function ProfileContent() {
         </div>
 
       </div>
-
-      {/* Floating Quick Action Buttons */}
-      <div className="hide-mobile" style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <button className="btn btn-primary" style={{ borderRadius: '50%', width: '48px', height: '48px', padding: 0, boxShadow: 'var(--shadow-glow)' }} title="Post Item to Sell">
-          <ShoppingCart size={20} />
-        </button>
-        <button className="btn btn-secondary" style={{ borderRadius: '50%', width: '48px', height: '48px', padding: 0, background: 'var(--bg-card)' }} title="Post Item to Rent">
-          <Calendar size={20} />
-        </button>
-        <button className="btn btn-secondary" style={{ borderRadius: '50%', width: '48px', height: '48px', padding: 0, background: 'var(--bg-card)' }} title="Request an Item">
-          <Plus size={20} />
-        </button>
-      </div>
     </div>
   );
 }
 
 // --- ACTIVE LISTINGS TAB ---
-function ListingsTab({ listings, togglePin }) {
-  const pinnedListings = listings.filter(l => l.pinned);
-  const otherListings = listings.filter(l => !l.pinned);
+function ListingsTab({ listings }) {
+  if (!listings || listings.length === 0) {
+    return (
+      <div className="card-glass text-center animate-fadeInUp" style={{ padding: 'var(--space-12)' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>🛒</div>
+        <h3 style={{ fontSize: 'var(--fs-lg)', marginBottom: 'var(--space-2)' }}>No listings yet</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-6)' }}>
+          List your old textbooks, calculators, aprons, or campus cycles to make extra cash!
+        </p>
+        <Link href="/marketplace/create" className="btn btn-primary">Create Your First Listing</Link>
+      </div>
+    );
+  }
 
   const getStatusBadgeClass = (status) => {
-    if (status === 'Available') return 'badge-success';
+    if (status === 'active') return 'badge-success';
     if (status === 'Sold') return 'badge-danger';
     if (status === 'Rented') return 'badge-warning';
     return 'badge-info';
@@ -423,85 +490,43 @@ function ListingsTab({ listings, togglePin }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      
-      {/* Pinned/Featured Listings */}
-      {pinnedListings.length > 0 && (
-        <div>
-          <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary-hover)' }}>
-            <Pin size={14} /> Featured Items
-          </h3>
-          <div className="grid grid-2">
-            {pinnedListings.map(item => (
-              <div key={item.id} className="card-glass card-interactive" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-                <div style={{ height: 140, background: `url(${item.image}) center/cover`, position: 'relative' }}>
-                  <button 
-                    onClick={() => togglePin(item.id)}
-                    style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', display: 'flex', color: 'var(--accent-primary-hover)' }}
-                  >
-                    <Pin size={12} fill="currentColor" />
-                  </button>
-                  <span className={`badge ${getStatusBadgeClass(item.status)}`} style={{ position: 'absolute', bottom: 10, left: 10 }}>{item.status}</span>
-                </div>
-                <div style={{ padding: 'var(--space-4)', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>{item.category} • {item.condition}</span>
-                  <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--text-primary)' }}>{item.title}</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-3)' }}>
-                    <span style={{ fontWeight: 'bold', color: 'var(--accent-success)', fontSize: 'var(--fs-base)' }}>{item.price}</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '4px' }}><Eye size={13} /></button>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '4px' }}><Edit3 size={13} /></button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* All/Other Listings */}
       <div>
         <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', marginBottom: 'var(--space-3)' }}>Active Listings</h3>
-        {otherListings.length === 0 ? <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>No other listings posted.</p> : (
-          <div className="grid grid-2">
-            {otherListings.map(item => (
-              <div key={item.id} className="card-glass card-interactive" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-                <div style={{ height: 120, background: `url(${item.image}) center/cover`, position: 'relative' }}>
-                  <button 
-                    onClick={() => togglePin(item.id)}
-                    style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', padding: '6px', cursor: 'pointer', display: 'flex', color: 'var(--text-secondary)' }}
-                  >
-                    <Pin size={12} />
-                  </button>
-                  <span className={`badge ${getStatusBadgeClass(item.status)}`} style={{ position: 'absolute', bottom: 10, left: 10 }}>{item.status}</span>
-                </div>
-                <div style={{ padding: 'var(--space-4)', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>{item.category} • {item.condition}</span>
-                  <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--text-primary)' }}>{item.title}</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-3)' }}>
-                    <span style={{ fontWeight: 'bold', color: 'var(--accent-success)', fontSize: 'var(--fs-base)' }}>{item.price}</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '4px' }}><Eye size={13} /></button>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '4px' }}><Edit3 size={13} /></button>
-                    </div>
+        <div className="grid grid-2">
+          {listings.map(item => (
+            <div key={item.id} className="card-glass card-interactive" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+              <div style={{ height: 120, background: item.imageUrl ? `url(${item.imageUrl}) center/cover` : 'var(--bg-tertiary)', position: 'relative' }}>
+                {!item.imageUrl && (
+                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>📦</div>
+                )}
+                <span className={`badge ${getStatusBadgeClass(item.status)}`} style={{ position: 'absolute', bottom: 10, left: 10 }}>{item.status}</span>
+              </div>
+              <div style={{ padding: 'var(--space-4)', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>{item.category} • {item.condition} condition</span>
+                <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: '2px 0 0', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-3)' }}>
+                  <span style={{ fontWeight: 'bold', color: 'var(--accent-success)', fontSize: 'var(--fs-base)' }}>
+                    {item.price > 0 ? `₹${item.price}` : 'Free'}
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <Link href={`/marketplace/${item.id}`} className="btn btn-ghost btn-sm" style={{ padding: '4px' }}><Eye size={13} /></Link>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
-
     </div>
   );
 }
 
 // --- MISSIONS TAB ---
-function MissionsTab({ missions, handleCompleteMission }) {
+function MissionsTab({ missions }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', margin: 0 }}>Marketplace Quests</h3>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', margin: '0 0 10px' }}>Optional missions to boost your experience and portfolio ranking.</p>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', margin: '0 0 10px' }}>Active quests automatically track your campus transaction progress and reward experience points.</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {missions.map(m => {
@@ -512,7 +537,7 @@ function MissionsTab({ missions, handleCompleteMission }) {
                 <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: 0, color: '#fff' }}>{m.title}</h4>
                 <span className="badge badge-success">+{m.xp} XP</span>
               </div>
-              <div style={{ display: 'flex', justifyBetween: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
                     <span>Quest Progress</span>
@@ -522,11 +547,7 @@ function MissionsTab({ missions, handleCompleteMission }) {
                     <div style={{ width: `${(m.progress / m.target) * 100}%`, height: '100%', background: isDone ? 'var(--gradient-success)' : 'var(--gradient-primary)' }} />
                   </div>
                 </div>
-                {!isDone ? (
-                  <button className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '10px' }} onClick={() => handleCompleteMission(m.id)}>
-                    Track
-                  </button>
-                ) : (
+                {isDone && (
                   <span style={{ color: 'var(--accent-success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 'bold' }}>
                     <Check size={16} /> Completed
                   </span>
@@ -541,11 +562,11 @@ function MissionsTab({ missions, handleCompleteMission }) {
 }
 
 // --- ACHIEVEMENTS TAB ---
-function AchievementsTab({ list, unlocked, unlock }) {
+function AchievementsTab({ list, unlocked }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', margin: 0 }}>Achievements Lockbox</h3>
-      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', margin: '0 0 12px' }}>Click locked achievements to simulate unlocking them and watch the animation!</p>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', margin: '0 0 12px' }}>Complete activities, list items, and get reviews to unlock badges.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
         {list.map(ach => {
@@ -553,18 +574,16 @@ function AchievementsTab({ list, unlocked, unlock }) {
           return (
             <div 
               key={ach.id} 
-              onClick={() => !isUnlocked && unlock(ach.id)}
-              className="card-glass card-interactive" 
+              className="card-glass" 
               style={{ 
                 padding: 'var(--space-4)', 
                 textAlign: 'center', 
-                filter: isUnlocked ? 'none' : 'grayscale(1) opacity(0.4)',
+                filter: isUnlocked ? 'none' : 'grayscale(1) opacity(0.35)',
                 border: isUnlocked ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '8px',
-                cursor: isUnlocked ? 'default' : 'pointer'
+                gap: '8px'
               }}
             >
               <span style={{ fontSize: '28px' }}>{ach.badge}</span>
@@ -580,71 +599,109 @@ function AchievementsTab({ list, unlocked, unlock }) {
 
 // --- LOOKING FOR TAB ---
 function LookingForTab({ requests }) {
+  if (!requests || requests.length === 0) {
+    return (
+      <div className="card-glass text-center animate-fadeInUp" style={{ padding: 'var(--space-12)' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>📋</div>
+        <h3 style={{ fontSize: 'var(--fs-lg)', marginBottom: 'var(--space-2)' }}>No requests posted yet</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-6)' }}>
+          Looking for a calculator, drawing instruments, or hostel gear? Post on the board!
+        </p>
+        <Link href="/requests" className="btn btn-primary">Create Your First Request</Link>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', margin: 0 }}>Requests Posted</h3>
-      {requests.length === 0 ? <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>No item requests posted yet.</p> : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {requests.map(req => (
-            <div key={req.id} className="card-glass" style={{ borderLeft: '4px solid var(--accent-info)', padding: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>{req.category}</span>
-                  <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: '2px 0 0' }}>{req.title}</h4>
-                </div>
-                <button className="btn btn-ghost btn-sm" style={{ padding: '4px' }}><Trash2 size={13} /></button>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>Target Budget: <strong style={{ color: 'var(--accent-success)' }}>{req.budget}</strong></span>
-                <button className="btn btn-ghost btn-sm" style={{ fontSize: '10px' }}>Edit</button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {requests.map(req => (
+          <div key={req.id} className="card-glass" style={{ borderLeft: '4px solid var(--accent-info)', padding: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>{req.category}</span>
+                <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: '2px 0 0' }}>{req.title}</h4>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
+              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>Target Budget: <strong style={{ color: 'var(--accent-success)' }}>{req.budget > 0 ? `₹${req.budget}` : 'Any budget'}</strong></span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 // --- WISHLIST TAB ---
 function WishlistTab({ items }) {
+  if (!items || items.length === 0) {
+    return (
+      <div className="card-glass text-center animate-fadeInUp" style={{ padding: 'var(--space-12)' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>❤️</div>
+        <h3 style={{ fontSize: 'var(--fs-lg)', marginBottom: 'var(--space-2)' }}>No wishlist items</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>
+          Save interesting textbooks, electronics or cycles from the marketplace to check them out later!
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', margin: 0 }}>Wishlist Preview</h3>
-      {items.length === 0 ? <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>No items in wishlist.</p> : (
-        <div className="grid grid-2">
-          {items.map(item => (
-            <div key={item.id} className="card-glass card-interactive" style={{ display: 'flex', gap: '12px', padding: '10px', alignItems: 'center' }}>
-              <img src={item.image} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} alt="" />
+      <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', margin: 0 }}>My Saved Items</h3>
+      <div className="grid grid-2">
+        {items.map(item => (
+          <Link key={item.id} href={`/marketplace/${item.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="card-glass card-interactive" style={{ display: 'flex', gap: '12px', padding: '10px', alignItems: 'center' }}>
+              {item.imageUrl ? (
+                <img src={item.imageUrl} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} alt="" />
+              ) : (
+                <div style={{ width: '56px', height: '56px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>📦</div>
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontSize: 'var(--fs-xs)', fontWeight: 'bold', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
                 <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>{item.category}</p>
-                <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent-success)', display: 'block', marginTop: '2px' }}>{item.price}</strong>
+                <strong style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent-success)', display: 'block', marginTop: '2px' }}>
+                  {item.price > 0 ? `₹${item.price}` : 'Free'}
+                </strong>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
 
 // --- REVIEWS TAB ---
-function ReviewsTab({ reviews, rating, count }) {
+function ReviewsTab({ reviews, rating }) {
+  if (!reviews || reviews.length === 0) {
+    return (
+      <div className="card-glass text-center animate-fadeInUp" style={{ padding: 'var(--space-12)' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>⭐</div>
+        <h3 style={{ fontSize: 'var(--fs-lg)', marginBottom: 'var(--space-2)' }}>No reviews yet</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>
+          Complete transactions with verified campus sellers or buyers to earn ratings and feedback.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      
       {/* Rating Summary Banner */}
       <div className="card-glass" style={{ display: 'flex', gap: 'var(--space-6)', alignItems: 'center', padding: 'var(--space-5)', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
         <div style={{ textAlign: 'center' }}>
-          <h3 style={{ fontSize: '32px', fontWeight: 'var(--fw-extrabold)', color: 'var(--accent-warning)', margin: 0 }}>{rating}</h3>
+          <h3 style={{ fontSize: '32px', fontWeight: 'var(--fw-extrabold)', color: 'var(--accent-warning)', margin: 0 }}>{rating.toFixed(1)}</h3>
           <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Out of 5 Stars</span>
         </div>
         <div style={{ flex: 1, height: '100%', borderLeft: '1px solid var(--border-color)', paddingLeft: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', color: 'var(--accent-warning)', gap: '2px' }}>
-            {[...Array(5)].map((_, i) => <Star key={i} size={14} fill="currentColor" />)}
+            {[...Array(5)].map((_, i) => <Star key={i} size={14} fill={i < Math.round(rating) ? 'currentColor' : 'none'} />)}
           </div>
-          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Verified reviews from buyers and sellers</span>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>Verified reviews from campus traders</span>
         </div>
       </div>
 
@@ -664,13 +721,24 @@ function ReviewsTab({ reviews, rating, count }) {
           </div>
         ))}
       </div>
-
     </div>
   );
 }
 
 // --- ACTIVITY TAB ---
 function ActivityTab({ activity }) {
+  if (!activity || activity.length === 0) {
+    return (
+      <div className="card-glass text-center animate-fadeInUp" style={{ padding: 'var(--space-12)' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>⏱️</div>
+        <h3 style={{ fontSize: 'var(--fs-lg)', marginBottom: 'var(--space-2)' }}>No recent activity</h3>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>
+          Create listings or post requests to start tracking activity.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="card-glass" style={{ padding: 'var(--space-6)' }}>
       <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-bold)', marginBottom: 'var(--space-4)' }}>Activity Log</h3>

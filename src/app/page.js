@@ -28,6 +28,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [listings, setListings] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [topSellers, setTopSellers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Live Stats
@@ -68,9 +69,36 @@ export default function HomePage() {
       }));
     });
 
+    // Fetch top sellers from users collection
+    const sellersQuery = query(collection(db, 'users'), orderBy('uploadsCount', 'desc'));
+    const unsubSellers = onSnapshot(sellersQuery, (snapshot) => {
+      const sellers = snapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          const displayName = data.displayName || 'Anonymous Student';
+          const initials = displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          return {
+            id: doc.id,
+            name: displayName,
+            avatar: initials,
+            branch: data.department || 'Branch',
+            year: data.year ? data.year.split(' ')[0] : 'Student',
+            level: data.level || 1,
+            rating: data.reputation > 0 ? (data.reputation / 10).toFixed(1) : 5.0,
+            uploadsCount: data.uploadsCount || 0
+          };
+        })
+        .filter(s => s.uploadsCount > 0)
+        .slice(0, 3);
+      setTopSellers(sellers);
+    }, (err) => {
+      console.error('Error fetching homepage top sellers:', err);
+    });
+
     return () => {
       unsubListings();
       unsubRequests();
+      unsubSellers();
     };
   }, []);
 
@@ -95,13 +123,6 @@ export default function HomePage() {
   const featuredListings = listings
     .filter(item => item.imageUrl && item.price > 0)
     .slice(0, 3);
-
-  // Mock Top Campus Sellers
-  const topSellers = [
-    { name: 'Rohan Sharma', branch: 'CSE', year: '3rd Year', rating: 4.9, trustScore: 98, avatar: 'RS', level: 8, badge: 'Super Seller' },
-    { name: 'Sneha Patel', branch: 'ENTC', year: '4th Year', rating: 4.8, trustScore: 95, avatar: 'SP', level: 12, badge: 'Campus Star' },
-    { name: 'Aditya Joshi', branch: 'Mech', year: '2nd Year', rating: 4.7, trustScore: 92, avatar: 'AJ', level: 5, badge: 'Rising Star' }
-  ];
 
   return (
     <div className="page-content" style={{ padding: '0 0 var(--space-16) 0' }}>
@@ -438,35 +459,41 @@ export default function HomePage() {
               <p style={{ color: 'var(--text-secondary)' }}>Most active student traders</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              {topSellers.map((seller) => (
-                <div key={seller.name} className="card-glass" style={{ padding: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', background: 'rgba(30,41,59,0.25)' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    background: 'var(--gradient-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 'bold',
-                    color: '#fff',
-                    fontSize: 'var(--fs-sm)',
-                    flexShrink: 0
-                  }}>
-                    {seller.avatar}
-                  </div>
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {seller.name} <ShieldCheck size={14} className="text-link" />
-                    </h4>
-                    <p style={{ fontSize: '10px', color: 'var(--text-secondary)', margin: 0 }}>{seller.branch} • {seller.year}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                      <span className="badge badge-info" style={{ fontSize: '8px', padding: '1px 3px' }}>Lvl {seller.level}</span>
-                      <span style={{ fontSize: '10px', color: 'var(--accent-warning)', fontWeight: 'bold' }}>⭐ {seller.rating}</span>
+              {topSellers.length === 0 ? (
+                <div className="card-glass" style={{ padding: 'var(--space-4)', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  No campus sellers active yet.
+                </div>
+              ) : (
+                topSellers.map((seller) => (
+                  <div key={seller.id} className="card-glass" style={{ padding: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', background: 'rgba(30,41,59,0.25)' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'var(--gradient-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold',
+                      color: '#fff',
+                      fontSize: 'var(--fs-sm)',
+                      flexShrink: 0
+                    }}>
+                      {seller.avatar}
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <h4 style={{ fontSize: 'var(--fs-sm)', fontWeight: 'bold', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {seller.name} <ShieldCheck size={14} className="text-link" />
+                      </h4>
+                      <p style={{ fontSize: '10px', color: 'var(--text-secondary)', margin: 0 }}>{seller.branch} • {seller.year}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <span className="badge badge-info" style={{ fontSize: '8px', padding: '1px 3px' }}>Lvl {seller.level}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--accent-warning)', fontWeight: 'bold' }}>⭐ {seller.rating}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 

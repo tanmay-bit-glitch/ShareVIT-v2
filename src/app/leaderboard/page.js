@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useGamification } from '@/context/GamificationContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -8,6 +8,8 @@ import {
   Trophy, Award, Star, ShoppingCart, Flame, Clock, 
   ChevronUp, ChevronDown, Minus, ShieldCheck, Heart, Sparkles
 } from 'lucide-react';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { motion } from 'framer-motion';
 
 export default function LeaderboardPage() {
@@ -19,57 +21,79 @@ export default function LeaderboardPage() {
 }
 
 function LeaderboardContent() {
-  const { userData } = useAuth();
+  const { user, userData } = useAuth();
   const { level, streak } = useGamification();
   const [activeTab, setActiveTab] = useState('Top Sellers');
+  const [usersList, setUsersList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const tabs = ['Top Sellers', 'Top Buyers', 'Top Renters', 'Most Active'];
 
-  const getLeaderboardData = () => {
-    const userName = userData?.displayName || 'You';
-    const userYear = userData?.year || 'SE CSE';
+  useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setUsersList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching users for leaderboard:', err);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
+  const getLeaderboardData = () => {
     let list = [];
     if (activeTab === 'Top Sellers') {
-      list = [
-        { name: 'Sanchita Chavan', year: 'SE CSE', change: 'up', itemsSold: 32, rating: 4.9 },
-        { name: 'Tanmay Chavan', year: 'TE CSE', change: 'up', itemsSold: 24, rating: 4.8 },
-        { name: 'Rohan Sharma', year: 'BE ENTC', change: 'down', itemsSold: 18, rating: 4.6 },
-        { name: 'Sneha Patel', year: 'SE IT', change: 'same', itemsSold: 15, rating: 4.7 },
-        { name: 'Aditya Patil', year: 'FE CSE', change: 'up', itemsSold: 9, rating: 4.4 },
-        { name: userName, year: userYear, change: 'up', itemsSold: 12, rating: 4.9, isCurrentUser: true }
-      ];
-      list.sort((a, b) => b.itemsSold - a.itemsSold);
+      list = usersList
+        .filter(u => (u.uploadsCount || 0) > 0)
+        .map(u => ({
+          name: u.displayName || 'Anonymous Student',
+          year: u.year || 'Student',
+          change: 'same',
+          itemsSold: u.uploadsCount || 0,
+          rating: u.reputation > 0 ? (u.reputation / 10).toFixed(1) : 5.0,
+          isCurrentUser: u.uid === user?.uid
+        }))
+        .sort((a, b) => b.itemsSold - a.itemsSold);
     } else if (activeTab === 'Top Buyers') {
-      list = [
-        { name: 'Rohan Sharma', year: 'BE ENTC', change: 'up', itemsBought: 45, savedAmount: '₹9,800' },
-        { name: 'Sneha Patel', year: 'SE IT', change: 'up', itemsBought: 38, savedAmount: '₹6,400' },
-        { name: 'Tanmay Chavan', year: 'TE CSE', change: 'down', itemsBought: 28, savedAmount: '₹4,500' },
-        { name: 'Sanchita Chavan', year: 'SE CSE', change: 'same', itemsBought: 22, savedAmount: '₹3,800' },
-        { name: 'Aditya Patil', year: 'FE CSE', change: 'up', itemsBought: 12, savedAmount: '₹1,900' },
-        { name: userName, year: userYear, change: 'up', itemsBought: 16, savedAmount: '₹2,800', isCurrentUser: true }
-      ];
-      list.sort((a, b) => b.itemsBought - a.itemsBought);
+      list = usersList
+        .filter(u => (u.downloadsCount || 0) > 0)
+        .map(u => ({
+          name: u.displayName || 'Anonymous Student',
+          year: u.year || 'Student',
+          change: 'same',
+          itemsBought: u.downloadsCount || 0,
+          savedAmount: `₹${(u.downloadsCount || 0) * 150}`,
+          isCurrentUser: u.uid === user?.uid
+        }))
+        .sort((a, b) => b.itemsBought - a.itemsBought);
     } else if (activeTab === 'Top Renters') {
-      list = [
-        { name: 'Sneha Patel', year: 'SE IT', change: 'up', itemsRented: 28, activeRentals: 4 },
-        { name: 'Sanchita Chavan', year: 'SE CSE', change: 'up', itemsRented: 21, activeRentals: 3 },
-        { name: 'Tanmay Chavan', year: 'TE CSE', change: 'same', itemsRented: 16, activeRentals: 2 },
-        { name: 'Rohan Sharma', year: 'BE ENTC', change: 'down', itemsRented: 11, activeRentals: 1 },
-        { name: 'Aditya Patil', year: 'FE CSE', change: 'up', itemsRented: 5, activeRentals: 0 },
-        { name: userName, year: userYear, change: 'same', itemsRented: 4, activeRentals: 2, isCurrentUser: true }
-      ];
-      list.sort((a, b) => b.itemsRented - a.itemsRented);
+      list = usersList
+        .filter(u => (u.rentalsCount || 0) > 0)
+        .map(u => ({
+          name: u.displayName || 'Anonymous Student',
+          year: u.year || 'Student',
+          change: 'same',
+          itemsRented: u.rentalsCount || 0,
+          activeRentals: u.activeRentals || 0,
+          isCurrentUser: u.uid === user?.uid
+        }))
+        .sort((a, b) => b.itemsRented - a.itemsRented);
     } else if (activeTab === 'Most Active') {
-      list = [
-        { name: 'Tanmay Chavan', year: 'TE CSE', change: 'up', loginStreak: 42, level: 7 },
-        { name: 'Sanchita Chavan', year: 'SE CSE', change: 'up', loginStreak: 35, level: 6 },
-        { name: 'Sneha Patel', year: 'SE IT', change: 'same', loginStreak: 28, level: 5 },
-        { name: 'Rohan Sharma', year: 'BE ENTC', change: 'down', loginStreak: 21, level: 5 },
-        { name: 'Aditya Patil', year: 'FE CSE', change: 'up', loginStreak: 14, level: 3 },
-        { name: userName, year: userYear, change: 'up', loginStreak: streak, level: level, isCurrentUser: true }
-      ];
-      list.sort((a, b) => b.loginStreak - a.loginStreak);
+      list = usersList
+        .filter(u => (u.streak || 0) > 0 || (u.level || 1) > 1)
+        .map(u => ({
+          name: u.displayName || 'Anonymous Student',
+          year: u.year || 'Student',
+          change: 'same',
+          loginStreak: u.streak || 0,
+          level: u.level || 1,
+          isCurrentUser: u.uid === user?.uid
+        }))
+        .sort((a, b) => {
+          if (b.loginStreak !== a.loginStreak) return b.loginStreak - a.loginStreak;
+          return b.level - a.level;
+        });
     }
 
     return list.map((item, index) => ({
@@ -80,7 +104,6 @@ function LeaderboardContent() {
 
   const activeData = getLeaderboardData();
   const topThree = activeData.slice(0, 3);
-  const remaining = activeData.slice(3);
 
   const getScoreDisplay = (student) => {
     if (activeTab === 'Top Sellers') return `${student.itemsSold} Sold`;
@@ -95,6 +118,16 @@ function LeaderboardContent() {
     if (activeTab === 'Top Renters') return `${student.activeRentals} Active`;
     return `Level ${student.level}`;
   };
+
+  if (loading) {
+    return (
+      <div className="page-content" style={{ padding: 'var(--space-8) 0' }}>
+        <div className="container" style={{ maxWidth: 1100, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+          <span className="spinner spinner-lg" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-content" style={{ padding: 'var(--space-8) 0' }}>
@@ -131,86 +164,94 @@ function LeaderboardContent() {
           ))}
         </div>
 
-        {/* Podium Top 3 */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 'var(--space-6)', marginBottom: 'var(--space-10)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
-          
-          {/* Second Place */}
-          {topThree[1] && (
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', order: 1 }}
-            >
-              <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--gradient-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)', color: '#fff', border: '3px solid #cbd5e1', boxShadow: 'var(--shadow-sm)' }}>
-                  {topThree[1].name.split(' ').map(n=>n[0]).join('')}
-                </div>
-                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '24px', height: '24px', borderRadius: '50%', background: '#cbd5e1', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 'bold' }}>2</div>
-              </div>
-              <p style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-sm)', textAlign: 'center', margin: '4px 0 0', color: topThree[1].isCurrentUser ? 'var(--accent-primary-hover)' : 'inherit' }}>
-                {topThree[1].name} {topThree[1].isCurrentUser && '(You)'}
-              </p>
-              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{topThree[1].year}</span>
-              <div className="card-glass" style={{ width: '130px', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(203, 213, 225, 0.03)', borderColor: 'rgba(203, 213, 225, 0.2)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', marginTop: 'var(--space-2)' }}>
-                <span style={{ fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-extrabold)', color: '#cbd5e1' }}>{getScoreDisplay(topThree[1])}</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{getSubtextDisplay(topThree[1])}</span>
-              </div>
-            </motion.div>
-          )}
+        {activeData.length === 0 ? (
+          <div className="card-glass text-center animate-fadeInUp" style={{ padding: 'var(--space-16)', margin: 'var(--space-8) 0' }}>
+            <Trophy size={48} style={{ color: 'var(--text-tertiary)', marginBottom: 'var(--space-4)', marginInline: 'auto' }} />
+            <h3 style={{ fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)', marginBottom: 'var(--space-2)' }}>No rankings available yet</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)' }}>Start listing items or completing transactions to top the leaderboard!</p>
+          </div>
+        ) : (
+          <>
+            {/* Podium Top 3 */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 'var(--space-6)', marginBottom: 'var(--space-10)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
+              
+              {/* Second Place */}
+              {topThree[1] && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', order: 1 }}
+                >
+                  <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--gradient-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)', color: '#fff', border: '3px solid #cbd5e1', boxShadow: 'var(--shadow-sm)' }}>
+                      {topThree[1].name.split(' ').map(n=>n[0]).join('')}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '24px', height: '24px', borderRadius: '50%', background: '#cbd5e1', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 'bold' }}>2</div>
+                  </div>
+                  <p style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-sm)', textAlign: 'center', margin: '4px 0 0', color: topThree[1].isCurrentUser ? 'var(--accent-primary-hover)' : 'inherit' }}>
+                    {topThree[1].name} {topThree[1].isCurrentUser && '(You)'}
+                  </p>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{topThree[1].year}</span>
+                  <div className="card-glass" style={{ width: '130px', height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(203, 213, 225, 0.03)', borderColor: 'rgba(203, 213, 225, 0.2)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', marginTop: 'var(--space-2)' }}>
+                    <span style={{ fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-extrabold)', color: '#cbd5e1' }}>{getScoreDisplay(topThree[1])}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{getSubtextDisplay(topThree[1])}</span>
+                  </div>
+                </motion.div>
+              )}
 
-          {/* First Place */}
-          {topThree[0] && (
-            <motion.div 
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', order: 2 }}
-            >
-              <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
-                <div style={{ position: 'absolute', top: '-18px', left: '50%', transform: 'translateX(-50%)', color: 'var(--accent-warning)' }}><Trophy size={22} style={{ filter: 'drop-shadow(0 0 4px rgba(245,158,11,0.5))' }} /></div>
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xl)', fontWeight: 'var(--fw-bold)', color: '#fff', border: '4px solid var(--accent-warning)', boxShadow: '0 0 20px rgba(245, 158, 11, 0.3)' }}>
-                  {topThree[0].name.split(' ').map(n=>n[0]).join('')}
-                </div>
-                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '28px', height: '28px', borderRadius: '50%', background: 'var(--accent-warning)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'bold' }}>1</div>
-              </div>
-              <p style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-base)', textAlign: 'center', margin: '4px 0 0', color: topThree[0].isCurrentUser ? 'var(--accent-primary-hover)' : 'inherit' }}>
-                {topThree[0].name} {topThree[0].isCurrentUser && '(You)'}
-              </p>
-              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{topThree[0].year}</span>
-              <div className="card-glass" style={{ width: '150px', height: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(245, 158, 11, 0.05)', borderColor: 'rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', marginTop: 'var(--space-2)' }}>
-                <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 'var(--fw-extrabold)', color: 'var(--accent-warning)' }}>{getScoreDisplay(topThree[0])}</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{getSubtextDisplay(topThree[0])}</span>
-              </div>
-            </motion.div>
-          )}
+              {/* First Place */}
+              {topThree[0] && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', order: 2 }}
+                >
+                  <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
+                    <div style={{ position: 'absolute', top: '-18px', left: '50%', transform: 'translateX(-50%)', color: 'var(--accent-warning)' }}><Trophy size={22} style={{ filter: 'drop-shadow(0 0 4px rgba(245,158,11,0.5))' }} /></div>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xl)', fontWeight: 'var(--fw-bold)', color: '#fff', border: '4px solid var(--accent-warning)', boxShadow: '0 0 20px rgba(245, 158, 11, 0.3)' }}>
+                      {topThree[0].name.split(' ').map(n=>n[0]).join('')}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '28px', height: '28px', borderRadius: '50%', background: 'var(--accent-warning)', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'bold' }}>1</div>
+                  </div>
+                  <p style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-base)', textAlign: 'center', margin: '4px 0 0', color: topThree[0].isCurrentUser ? 'var(--accent-primary-hover)' : 'inherit' }}>
+                    {topThree[0].name} {topThree[0].isCurrentUser && '(You)'}
+                  </p>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{topThree[0].year}</span>
+                  <div className="card-glass" style={{ width: '150px', height: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(245, 158, 11, 0.05)', borderColor: 'rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', marginTop: 'var(--space-2)' }}>
+                    <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 'var(--fw-extrabold)', color: 'var(--accent-warning)' }}>{getScoreDisplay(topThree[0])}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{getSubtextDisplay(topThree[0])}</span>
+                  </div>
+                </motion.div>
+              )}
 
-          {/* Third Place */}
-          {topThree[2] && (
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', order: 3 }}
-            >
-              <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--gradient-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)', color: '#fff', border: '3px solid #b45309', boxShadow: 'var(--shadow-sm)' }}>
-                  {topThree[2].name.split(' ').map(n=>n[0]).join('')}
-                </div>
-                <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '24px', height: '24px', borderRadius: '50%', background: '#b45309', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 'bold' }}>3</div>
-              </div>
-              <p style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-sm)', textAlign: 'center', margin: '4px 0 0', color: topThree[2].isCurrentUser ? 'var(--accent-primary-hover)' : 'inherit' }}>
-                {topThree[2].name} {topThree[2].isCurrentUser && '(You)'}
-              </p>
-              <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{topThree[2].year}</span>
-              <div className="card-glass" style={{ width: '130px', height: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(180, 83, 9, 0.03)', borderColor: 'rgba(180, 83, 9, 0.2)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', marginTop: 'var(--space-2)' }}>
-                <span style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-extrabold)', color: '#b45309' }}>{getScoreDisplay(topThree[2])}</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{getSubtextDisplay(topThree[2])}</span>
-              </div>
-            </motion.div>
-          )}
+              {/* Third Place */}
+              {topThree[2] && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', order: 3 }}
+                >
+                  <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'var(--gradient-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-bold)', color: '#fff', border: '3px solid #b45309', boxShadow: 'var(--shadow-sm)' }}>
+                      {topThree[2].name.split(' ').map(n=>n[0]).join('')}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '24px', height: '24px', borderRadius: '50%', background: '#b45309', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-xs)', fontWeight: 'bold' }}>3</div>
+                  </div>
+                  <p style={{ fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-sm)', textAlign: 'center', margin: '4px 0 0', color: topThree[2].isCurrentUser ? 'var(--accent-primary-hover)' : 'inherit' }}>
+                    {topThree[2].name} {topThree[2].isCurrentUser && '(You)'}
+                  </p>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{topThree[2].year}</span>
+                  <div className="card-glass" style={{ width: '130px', height: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(180, 83, 9, 0.03)', borderColor: 'rgba(180, 83, 9, 0.2)', borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', marginTop: 'var(--space-2)' }}>
+                    <span style={{ fontSize: 'var(--fs-base)', fontWeight: 'var(--fw-extrabold)', color: '#b45309' }}>{getScoreDisplay(topThree[2])}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>{getSubtextDisplay(topThree[2])}</span>
+                  </div>
+                </motion.div>
+              )}
 
-        </div>
+            </div>
 
         {/* Leaderboard Table List */}
         <div className="card-glass" style={{ padding: 0, overflow: 'hidden' }}>
@@ -288,8 +329,12 @@ function LeaderboardContent() {
           </div>
 
         </div>
+      </>
+    )}
 
       </div>
     </div>
   );
 }
+
+
