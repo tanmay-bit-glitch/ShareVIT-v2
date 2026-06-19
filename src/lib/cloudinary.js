@@ -1,6 +1,8 @@
+import axios from 'axios';
+
 /**
  * Reusable utility for client-side uploads to Cloudinary
- * using XMLHttpRequest to support progress tracking.
+ * using Axios to support progress tracking.
  */
 
 const getCloudinaryConfig = () => {
@@ -15,58 +17,38 @@ const getCloudinaryConfig = () => {
 };
 
 /**
- * Base file upload handler
+ * Base file upload handler using Axios
  */
-export const uploadFile = (file, resourceType = 'auto', onProgress) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const { cloudName, uploadPreset } = getCloudinaryConfig();
+export const uploadFile = async (file, resourceType = 'auto', onProgress) => {
+  const { cloudName, uploadPreset } = getCloudinaryConfig();
 
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, true);
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
 
-      // Track progress
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          onProgress(percentComplete);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            if (response.secure_url) {
-              resolve(response.secure_url);
-            } else {
-              reject(new Error('Cloudinary response did not contain secure_url.'));
-            }
-          } catch (err) {
-            reject(new Error('Failed to parse Cloudinary upload response.'));
-          }
-        } else {
-          try {
-            const response = JSON.parse(xhr.responseText);
-            reject(new Error(response.error?.message || `Upload failed with status ${xhr.status}`));
-          } catch (e) {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+  try {
+    const response = await axios.post(
+      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
+      formData,
+      {
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentComplete);
           }
         }
-      };
+      }
+    );
 
-      xhr.onerror = () => {
-        reject(new Error('Network error occurred during Cloudinary upload.'));
-      };
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', uploadPreset);
-      xhr.send(formData);
-    } catch (error) {
-      reject(error);
+    if (response.data?.secure_url) {
+      return response.data.secure_url;
+    } else {
+      throw new Error('Cloudinary response did not contain secure_url.');
     }
-  });
+  } catch (err) {
+    const errorMsg = err.response?.data?.error?.message || err.message || 'Upload failed.';
+    throw new Error(errorMsg);
+  }
 };
 
 /**
