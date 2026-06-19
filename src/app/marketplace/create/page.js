@@ -103,6 +103,13 @@ function CreateListingContent() {
       listingType: isDoc ? 'Donate' : 'Sell',
       price: ''
     }));
+
+    setImage(null);
+    setPreview(null);
+    setPdfFile(null);
+    setPdfName('');
+    setImageProgress(0);
+    setPdfProgress(0);
   };
 
   const handleImageChange = (e) => {
@@ -205,12 +212,6 @@ function CreateListingContent() {
         pdfUrl = await uploadDocument(pdfFile, (progress) => {
           setPdfProgress(progress);
         });
-
-        if (image) {
-          imageUrl = await uploadImage(image, (progress) => {
-            setImageProgress(progress);
-          });
-        }
       } else {
         if (!image) {
           throw new Error('Please upload at least one image of the product.');
@@ -397,42 +398,41 @@ function CreateListingContent() {
                     </div>
                   )}
 
-                  {/* Image slot (Optional for Academic, Required for Physical goods) */}
-                  <div className="form-group">
-                    <label className="form-label">
-                      {isDocumentCategory(form.category) ? 'Thumbnail Preview Image (Optional)' : 'Item Image *'}
-                    </label>
-                    <div 
-                      onClick={() => document.getElementById('listing-image').click()}
-                      style={{ 
-                        border: '2px dashed rgba(255,255,255,0.15)', 
-                        borderRadius: '12px', 
-                        padding: '24px 16px', 
-                        textAlign: 'center',
-                        background: 'rgba(15, 23, 41, 0.25)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minHeight: '140px'
-                      }}
-                    >
-                      {preview ? (
-                        <div style={{ position: 'relative', width: '100%', maxWidth: '240px' }}>
-                          <img src={preview} alt="Preview" style={{ maxHeight: '120px', objectFit: 'contain', width: '100%', borderRadius: '8px' }} />
-                          <p style={{ fontSize: '10px', color: 'var(--accent-primary)', marginTop: '6px', fontWeight: 'bold', margin: 0 }}>Replace photo</p>
-                        </div>
-                      ) : (
-                        <>
-                          <ImageIcon size={28} style={{ color: '#64748b', marginBottom: '8px' }} />
-                          <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select Photo</p>
-                          <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>JPG, PNG up to 5MB</p>
-                        </>
-                      )}
-                      <input id="listing-image" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
+                  {isImageCategory(form.category) && (
+                    <div className="form-group">
+                      <label className="form-label">Item Image *</label>
+                      <div 
+                        onClick={() => document.getElementById('listing-image').click()}
+                        style={{ 
+                          border: '2px dashed rgba(255,255,255,0.15)', 
+                          borderRadius: '12px', 
+                          padding: '24px 16px', 
+                          textAlign: 'center',
+                          background: 'rgba(15, 23, 41, 0.25)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '140px'
+                        }}
+                      >
+                        {preview ? (
+                          <div style={{ position: 'relative', width: '100%', maxWidth: '240px' }}>
+                            <img src={preview} alt="Preview" style={{ maxHeight: '120px', objectFit: 'contain', width: '100%', borderRadius: '8px' }} />
+                            <p style={{ fontSize: '10px', color: 'var(--accent-primary)', marginTop: '6px', fontWeight: 'bold', margin: 0 }}>Replace photo</p>
+                          </div>
+                        ) : (
+                          <>
+                            <ImageIcon size={28} style={{ color: '#64748b', marginBottom: '8px' }} />
+                            <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select Photo</p>
+                            <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>JPG, PNG up to 5MB</p>
+                          </>
+                        )}
+                        <input id="listing-image" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                 </div>
               )}
