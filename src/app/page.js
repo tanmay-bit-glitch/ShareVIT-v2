@@ -12,15 +12,12 @@ import {
 } from 'lucide-react';
 
 const CATEGORIES = [
-  { name: 'Books', emoji: '📚', desc: 'Textbooks & PYQs' },
-  { name: 'Electronics', emoji: '💻', desc: 'Laptops, calculators' },
-  { name: 'Gadgets', emoji: '🔌', desc: 'Power banks, IoT, chargers' },
-  { name: 'Cycles', emoji: '🚲', desc: 'Bicycles & accessories' },
-  { name: 'Hostel Essentials', emoji: '🧹', desc: 'Mattresses, buckets, locks' },
-  { name: 'Lab Equipment', emoji: '🧪', desc: 'Aprons, drafters, kits' },
-  { name: 'Stationery', emoji: '✏️', desc: 'Pens, notebooks, registers' },
-  { name: 'Notes', emoji: '📝', desc: 'Handwritten & print notes' },
-  { name: 'Other', emoji: '📦', desc: 'Miscellaneous items' }
+  { name: 'Notes', emoji: '📝', desc: 'Handwritten & printed lecture notes' },
+  { name: 'Assignments', emoji: '📄', desc: 'Solved assignments & lab manuals' },
+  { name: 'Books', emoji: '📚', desc: 'Textbooks & academic reference books' },
+  { name: 'Electronics', emoji: '💻', desc: 'Laptops, calculators & devices' },
+  { name: 'Study Materials', emoji: '📁', desc: 'PYQs, practical sheets & study guides' },
+  { name: 'Miscellaneous', emoji: '📦', desc: 'Other general student essentials' }
 ];
 
 export default function HomePage() {

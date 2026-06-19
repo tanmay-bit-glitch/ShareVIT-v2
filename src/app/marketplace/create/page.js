@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -9,24 +9,36 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { notifyGroup } from '@/lib/notifications';
+import { ENGINEERING_BRANCHES } from '@/lib/constants';
 import { 
   Upload, Check, ChevronRight, ChevronLeft, Image as ImageIcon, 
-  FileText, DollarSign, Eye, ShoppingCart 
+  FileText, DollarSign, Eye, FileUp, Sparkles
 } from 'lucide-react';
 
-const CATEGORIES = ['Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
+const CATEGORIES = ['Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
 const LISTING_TYPES = ['Sell', 'Rent', 'Donate', 'Exchange'];
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 const LOCATIONS = ['Hostel', 'Campus', 'Outside Campus'];
 
 export default function CreateListingPage() {
-  return <ProtectedRoute><CreateListingContent /></ProtectedRoute>;
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={
+        <div className="flex-center" style={{ minHeight: '50vh' }}>
+          <div className="spinner spinner-lg" />
+        </div>
+      }>
+        <CreateListingContent />
+      </Suspense>
+    </ProtectedRoute>
+  );
 }
 
 function CreateListingContent() {
   const { user, userData } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const searchParams = useSearchParams();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -36,13 +48,52 @@ function CreateListingContent() {
     title: '', 
     description: '', 
     category: '', 
-    listingType: 'Sell', 
+    listingType: 'Donate', 
     price: '', 
     condition: 'Good', 
-    location: 'Campus' 
+    location: 'Campus',
+    // Academic fields
+    subjectName: '',
+    department: '',
+    semester: '',
+    facultyName: '',
+    assignmentType: '',
+    subcategory: '',
+    // Physical goods fields
+    author: ''
   });
+
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
+  
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfName, setPdfName] = useState('');
+
+  // Sync Category from search parameters
+  useEffect(() => {
+    const qCategory = searchParams.get('category');
+    if (qCategory && CATEGORIES.includes(qCategory)) {
+      setForm(prev => {
+        const isAcademic = qCategory === 'Notes' || qCategory === 'Assignments' || qCategory === 'Study Materials';
+        return { 
+          ...prev, 
+          category: qCategory,
+          listingType: isAcademic ? 'Donate' : 'Sell'
+        };
+      });
+    }
+  }, [searchParams]);
+
+  // Adjust defaults when category changes
+  const handleCategoryChange = (val) => {
+    const isAcademic = val === 'Notes' || val === 'Assignments' || val === 'Study Materials';
+    setForm(prev => ({
+      ...prev,
+      category: val,
+      listingType: isAcademic ? 'Donate' : 'Sell',
+      price: ''
+    }));
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -56,35 +107,69 @@ function CreateListingContent() {
     }
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
+  const handlePdfChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        return toast.error('Please upload a PDF file.');
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        return toast.error('PDF file size must be less than 15MB.');
+      }
+      setPdfFile(file);
+      setPdfName(file.name);
+      toast.success('PDF document loaded!');
+    }
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      if (file.size > 5 * 1024 * 1024) {
-        return toast.error('Image size must be less than 5MB.');
-      }
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
-      toast.success('Image dropped successfully!');
-    } else {
-      toast.error('Please drop an image file.');
-    }
+  const isAcademicCategory = () => {
+    return form.category === 'Notes' || form.category === 'Assignments' || form.category === 'Study Materials';
   };
 
   const nextStep = () => {
-    if (step === 2 && !form.title.trim()) {
-      return toast.error('Please enter a title for your item.');
+    if (step === 1) {
+      if (!form.category) {
+        return toast.error('Please select a category first.');
+      }
+      if (isAcademicCategory() && !pdfFile) {
+        return toast.error('Please attach a PDF document for academic sharing.');
+      }
+      if (!isAcademicCategory() && !image) {
+        return toast.error('Please upload at least one image of the product.');
+      }
     }
-    if (step === 3 && !form.category) {
-      return toast.error('Please select a category.');
+    
+    if (step === 2) {
+      if (!form.title.trim()) {
+        return toast.error('Please enter a listing title.');
+      }
+      // Validate dynamic detail fields
+      if (form.category === 'Notes') {
+        if (!form.subjectName.trim()) return toast.error('Subject Name is required.');
+        if (!form.department) return toast.error('Please select the department.');
+        if (!form.semester) return toast.error('Please select the semester.');
+      }
+      if (form.category === 'Assignments') {
+        if (!form.subjectName.trim()) return toast.error('Subject Name is required.');
+        if (!form.semester) return toast.error('Please select the semester.');
+        if (!form.assignmentType) return toast.error('Please select the assignment type.');
+      }
+      if (form.category === 'Study Materials') {
+        if (!form.subjectName.trim()) return toast.error('Subject Name is required.');
+        if (!form.semester) return toast.error('Please select the semester.');
+        if (!form.subcategory) return toast.error('Please select the subcategory.');
+      }
+      if (form.category === 'Books') {
+        if (!form.author.trim()) return toast.error('Book author is required.');
+      }
     }
-    if (step === 3 && form.listingType !== 'Donate' && form.listingType !== 'Exchange' && !form.price) {
-      return toast.error('Please set a price (or change type to Donate/Exchange).');
+
+    if (step === 3) {
+      if (form.listingType !== 'Donate' && form.listingType !== 'Exchange' && !form.price) {
+        return toast.error('Please specify a price (or select Donate/Exchange type).');
+      }
     }
+
     setStep(prev => Math.min(prev + 1, 4));
   };
 
@@ -102,14 +187,38 @@ function CreateListingContent() {
         imageUrl = await getDownloadURL(imageRef);
       }
 
+      let pdfUrl = '';
+      if (pdfFile) {
+        const pdfRef = ref(storage, `listings_files/${user.uid}/${Date.now()}_${pdfFile.name}`);
+        await uploadBytes(pdfRef, pdfFile);
+        pdfUrl = await getDownloadURL(pdfRef);
+      }
+
       const listingData = {
-        ...form,
+        title: form.title,
+        description: form.description,
+        category: form.category,
+        listingType: form.listingType,
         price: (form.listingType === 'Donate' || form.listingType === 'Exchange') ? 0 : Number(form.price) || 0,
+        condition: isAcademicCategory() ? 'New' : form.condition,
+        location: form.location,
+        // Category specific details
+        subjectName: isAcademicCategory() ? form.subjectName : '',
+        department: form.category === 'Notes' ? form.department : '',
+        semester: isAcademicCategory() ? form.semester : '',
+        facultyName: form.category === 'Assignments' ? form.facultyName : '',
+        assignmentType: form.category === 'Assignments' ? form.assignmentType : '',
+        subcategory: form.category === 'Study Materials' ? form.subcategory : '',
+        author: form.category === 'Books' ? form.author : '',
+        // Media URLs
         imageUrl,
+        pdfUrl,
+        downloads: 0,
+        // Seller details
         sellerId: user.uid,
         sellerName: userData?.displayName || 'Anonymous',
         sellerEmail: user.email,
-        sellerTrustScore: userData?.trustScore || 95,
+        sellerTrustScore: userData?.trustScore || 96,
         sellerRating: userData?.rating || 4.8,
         sellerBranch: userData?.branch || 'CSE',
         sellerYear: userData?.year || '3rd Year',
@@ -122,11 +231,11 @@ function CreateListingContent() {
       await addDoc(collection(db, 'listings'), listingData);
       await updateDoc(doc(db, 'users', user.uid), { uploadsCount: increment(1) });
       
-      // Trigger notifications for campus mates
+      // Trigger notifications
       if (userData?.campus) {
         await notifyGroup(
-          `New Marketplace Item: ${form.title}`,
-          `${userData?.displayName || 'Someone'} listed a new item for ${form.listingType}.`,
+          `New ${form.category}: ${form.title}`,
+          `${userData?.displayName || 'Someone'} shared a new post.`,
           'Marketplace',
           { campus: userData.campus },
           { itemId: form.title },
@@ -135,7 +244,8 @@ function CreateListingContent() {
       }
 
       toast.success('Listing published successfully!');
-      router.push('/marketplace');
+      const categoryRoute = form.category.toLowerCase().replace(' ', '-');
+      router.push(`/marketplace/${categoryRoute}`);
     } catch (err) {
       console.error(err);
       toast.error('Failed to publish listing.');
@@ -144,22 +254,21 @@ function CreateListingContent() {
     }
   };
 
-  // Helper for progress indicator line width
   const getProgressLineWidth = () => {
     return `${((step - 1) / 3) * 100}%`;
   };
 
   return (
-    <div className="page-content">
+    <div className="page-content" style={{ background: '#0b0f19', color: '#f8fafc', minHeight: '90vh' }}>
       <div className="container" style={{ maxWidth: '680px' }}>
         
         {/* Header */}
         <div className="page-header text-center animate-fadeInUp" style={{ marginBottom: 'var(--space-6)' }}>
           <h1>List an Item</h1>
-          <p>Complete the steps to publish your listing to the campus marketplace</p>
+          <p>Provide information about your academic file or physical product</p>
         </div>
 
-        {/* Wizard Progress Indicator */}
+        {/* Progress Bar */}
         <div className="wizard-progress-bar animate-fadeInUp">
           <div className="wizard-progress-line" style={{ width: getProgressLineWidth() }} />
           
@@ -177,129 +286,282 @@ function CreateListingContent() {
           </div>
         </div>
 
-        {/* Wizard Titles */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 'var(--space-8)', padding: '0 4px' }}>
-          <span style={{ color: step === 1 ? 'var(--accent-primary)' : 'inherit' }}>Upload</span>
+        {/* Steps Labels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 'var(--space-8)', padding: '0 4px' }}>
+          <span style={{ color: step === 1 ? 'var(--accent-primary)' : 'inherit' }}>Files & Category</span>
           <span style={{ color: step === 2 ? 'var(--accent-primary)' : 'inherit' }}>Details</span>
-          <span style={{ color: step === 3 ? 'var(--accent-primary)' : 'inherit' }}>Type & Price</span>
+          <span style={{ color: step === 3 ? 'var(--accent-primary)' : 'inherit' }}>Pricing & Pickup</span>
           <span style={{ color: step === 4 ? 'var(--accent-primary)' : 'inherit' }}>Publish</span>
         </div>
 
-        {/* Wizard Card Form */}
-        <div className="card-glass animate-fadeInUp" style={{ padding: 'var(--space-8)' }}>
+        {/* Main Wizard Form Wrapper */}
+        <div className="card-glass animate-fadeInUp" style={{ padding: 'var(--space-8)', background: 'rgba(17, 24, 39, 0.45)', border: '1px solid rgba(255,255,255,0.06)' }}>
           
-          {/* STEP 1: Upload Images */}
+          {/* STEP 1: Choose Category and Upload Files */}
           {step === 1 && (
             <div>
-              <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'bold', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ImageIcon size={18} style={{ color: 'var(--accent-primary)' }} /> Upload Item Image
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={18} style={{ color: 'var(--accent-primary)' }} /> Select Category & File Uploads
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', marginBottom: 'var(--space-6)' }}>
-                Items with clear images receive up to 80% more views and inquires.
-              </p>
 
-              <div 
-                className="upload-area" 
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById('listing-image').click()}
-                style={{ 
-                  border: '2px dashed var(--border-color)', 
-                  borderRadius: 'var(--radius-lg)', 
-                  padding: 'var(--space-10) var(--space-6)', 
-                  textAlign: 'center',
-                  background: 'rgba(15, 23, 41, 0.2)',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s',
-                  minHeight: '220px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
-              >
-                {preview ? (
-                  <div style={{ position: 'relative', width: '100%', maxWidth: '320px' }}>
-                    <img 
-                      src={preview} 
-                      alt="Listing Preview" 
-                      style={{ maxHeight: '200px', objectFit: 'contain', width: '100%', borderRadius: 'var(--radius-md)' }} 
-                    />
-                    <p style={{ fontSize: '11px', color: 'var(--text-link)', marginTop: '8px', fontWeight: 'bold' }}>Click image to replace</p>
-                  </div>
-                ) : (
-                  <>
-                    <Upload size={36} style={{ color: 'var(--text-tertiary)', marginBottom: 'var(--space-3)' }} />
-                    <p style={{ fontWeight: 'bold', fontSize: 'var(--fs-sm)', margin: '0 0 var(--space-1) 0' }}>Drag & Drop your image here</p>
-                    <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', margin: 0 }}>or click to browse from files (Max 5MB)</p>
-                  </>
-                )}
-                <input 
-                  id="listing-image" 
-                  type="file" 
-                  accept="image/*" 
-                  style={{ display: 'none' }} 
-                  onChange={handleImageChange} 
-                />
+              <div className="form-group" style={{ marginBottom: '24px' }}>
+                <label className="form-label">Category *</label>
+                <select 
+                  className="form-select" 
+                  value={form.category} 
+                  onChange={e => handleCategoryChange(e.target.value)}
+                  style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  <option value="">Select Category</option>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
+
+              {/* Dynamic File Uploader slots */}
+              {form.category && (
+                <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  
+                  {/* Academic PDF Slot */}
+                  {isAcademicCategory() && (
+                    <div className="form-group">
+                      <label className="form-label">Academic Document (PDF) *</label>
+                      <div 
+                        onClick={() => document.getElementById('listing-pdf').click()}
+                        style={{ 
+                          border: '2px dashed rgba(255,255,255,0.15)', 
+                          borderRadius: '12px', 
+                          padding: '24px 16px', 
+                          textAlign: 'center',
+                          background: 'rgba(15, 23, 41, 0.25)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <FileUp size={28} style={{ color: 'var(--accent-primary)' }} />
+                        {pdfName ? (
+                          <div>
+                            <p style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff', margin: 0 }}>{pdfName}</p>
+                            <p style={{ fontSize: '11px', color: 'var(--accent-success)', margin: '4px 0 0' }}>Click to replace PDF</p>
+                          </div>
+                        ) : (
+                          <>
+                            <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select PDF Document</p>
+                            <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>PDF files up to 15MB</p>
+                          </>
+                        )}
+                        <input id="listing-pdf" type="file" accept="application/pdf" style={{ display: 'none' }} onChange={handlePdfChange} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image slot (Optional for Academic, Required for Physical goods) */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      {isAcademicCategory() ? 'Thumbnail Preview Image (Optional)' : 'Item Image *'}
+                    </label>
+                    <div 
+                      onClick={() => document.getElementById('listing-image').click()}
+                      style={{ 
+                        border: '2px dashed rgba(255,255,255,0.15)', 
+                        borderRadius: '12px', 
+                        padding: '24px 16px', 
+                        textAlign: 'center',
+                        background: 'rgba(15, 23, 41, 0.25)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '140px'
+                      }}
+                    >
+                      {preview ? (
+                        <div style={{ position: 'relative', width: '100%', maxWidth: '240px' }}>
+                          <img src={preview} alt="Preview" style={{ maxHeight: '120px', objectFit: 'contain', width: '100%', borderRadius: '8px' }} />
+                          <p style={{ fontSize: '10px', color: 'var(--accent-primary)', marginTop: '6px', fontWeight: 'bold', margin: 0 }}>Replace photo</p>
+                        </div>
+                      ) : (
+                        <>
+                          <ImageIcon size={28} style={{ color: '#64748b', marginBottom: '8px' }} />
+                          <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select Photo</p>
+                          <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>JPG, PNG up to 5MB</p>
+                        </>
+                      )}
+                      <input id="listing-image" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
+                    </div>
+                  </div>
+
+                </div>
+              )}
             </div>
           )}
 
-          {/* STEP 2: Core Details */}
+          {/* STEP 2: Detail fields based on Category */}
           {step === 2 && (
             <div>
-              <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'bold', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileText size={18} style={{ color: 'var(--accent-primary)' }} /> Item Details
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileText size={18} style={{ color: 'var(--accent-primary)' }} /> Listing Specifications
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', marginBottom: 'var(--space-6)' }}>
-                Give your item a clear name and describe any flaws or specifications.
-              </p>
 
+              {/* Title input */}
               <div className="form-group">
-                <label className="form-label">Title *</label>
+                <label className="form-label">
+                  {form.category === 'Notes' ? 'Notes Title *' :
+                   form.category === 'Assignments' ? 'Assignment Title *' :
+                   form.category === 'Books' ? 'Book Title *' :
+                   form.category === 'Electronics' ? 'Product Name *' :
+                   form.category === 'Study Materials' ? 'Material Title *' : 'Listing Title *'}
+                </label>
                 <input 
                   className="form-input" 
-                  placeholder="e.g. fx-991EX Scientific Calculator" 
+                  placeholder="e.g. fx-991EX Scientific Calculator, B.S. Grewal, Unit 2 DSA" 
                   value={form.title} 
-                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))} 
+                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                  style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Description</label>
+              {/* DYNAMIC METADATA INPUTS */}
+              
+              {/* Category: NOTES */}
+              {form.category === 'Notes' && (
+                <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Subject Name *</label>
+                    <input className="form-input" placeholder="e.g. Data Structures & Algorithms" value={form.subjectName} onChange={e => setForm(p => ({ ...p, subjectName: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Semester *</label>
+                      <select className="form-select" value={form.semester} onChange={e => setForm(p => ({ ...p, semester: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="">Select</option>
+                        {['1', '2', '3', '4', '5', '6', '7', '8'].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Department *</label>
+                      <select className="form-select" value={form.department} onChange={e => setForm(p => ({ ...p, department: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="">Select</option>
+                        {ENGINEERING_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Category: ASSIGNMENTS */}
+              {form.category === 'Assignments' && (
+                <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Subject Name *</label>
+                    <input className="form-input" placeholder="e.g. Computer Networks" value={form.subjectName} onChange={e => setForm(p => ({ ...p, subjectName: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Semester *</label>
+                      <select className="form-select" value={form.semester} onChange={e => setForm(p => ({ ...p, semester: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="">Select</option>
+                        {['1', '2', '3', '4', '5', '6', '7', '8'].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Assignment Type *</label>
+                      <select className="form-select" value={form.assignmentType} onChange={e => setForm(p => ({ ...p, assignmentType: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="">Select</option>
+                        {['Assignment', 'Lab Manual', 'Project Report', 'Mini Project'].map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Faculty Name (Optional)</label>
+                    <input className="form-input" placeholder="e.g. Prof. G. R. Deshpande" value={form.facultyName} onChange={e => setForm(p => ({ ...p, facultyName: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Category: STUDY MATERIALS */}
+              {form.category === 'Study Materials' && (
+                <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Subject Name *</label>
+                    <input className="form-input" placeholder="e.g. Engineering Chemistry" value={form.subjectName} onChange={e => setForm(p => ({ ...p, subjectName: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Semester *</label>
+                      <select className="form-select" value={form.semester} onChange={e => setForm(p => ({ ...p, semester: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="">Select</option>
+                        {['1', '2', '3', '4', '5', '6', '7', '8'].map(s => <option key={s} value={s}>Semester {s}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Subcategory *</label>
+                      <select className="form-select" value={form.subcategory} onChange={e => setForm(p => ({ ...p, subcategory: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <option value="">Select</option>
+                        {['Previous Year Papers', 'Lab Manuals', 'Practical Files', 'Viva Notes'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Category: BOOKS */}
+              {form.category === 'Books' && (
+                <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Author Name *</label>
+                    <input className="form-input" placeholder="e.g. B.S. Grewal" value={form.author} onChange={e => setForm(p => ({ ...p, author: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Condition</label>
+                      <select className="form-select" value={form.condition} onChange={e => setForm(p => ({ ...p, condition: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Pickup Location</label>
+                      <select className="form-select" value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Category: ELECTRONICS / MISC */}
+              {(form.category === 'Electronics' || form.category === 'Miscellaneous') && (
+                <div className="animate-fadeInUp" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">Condition</label>
+                    <select className="form-select" value={form.condition} onChange={e => setForm(p => ({ ...p, condition: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Pickup Location</label>
+                    <select className="form-select" value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="form-group" style={{ marginTop: '14px' }}>
+                <label className="form-label">Description (Optional)</label>
                 <textarea 
                   className="form-textarea" 
-                  placeholder="e.g. Used for 2 semesters, completely scratchless, has all keys working. Includes original cover." 
+                  placeholder="Provide details about flaws, syllabus scope, topics covered, or specs..." 
                   rows={4}
                   value={form.description} 
-                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))} 
+                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-                <div className="form-group">
-                  <label className="form-label">Condition</label>
-                  <select 
-                    className="form-select" 
-                    value={form.condition} 
-                    onChange={e => setForm(p => ({ ...p, condition: e.target.value }))}
-                  >
-                    {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Pickup Location</label>
-                  <select 
-                    className="form-select" 
-                    value={form.location} 
-                    onChange={e => setForm(p => ({ ...p, location: e.target.value }))}
-                  >
-                    {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
               </div>
             </div>
           )}
@@ -307,36 +569,23 @@ function CreateListingContent() {
           {/* STEP 3: Pricing & Type */}
           {step === 3 && (
             <div>
-              <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'bold', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <DollarSign size={18} style={{ color: 'var(--accent-primary)' }} /> Type, Category & Pricing
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <DollarSign size={18} style={{ color: 'var(--accent-primary)' }} /> Pricing & Listing Type
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', marginBottom: 'var(--space-6)' }}>
-                Choose how students can acquire your item and categorize it.
+              <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: 'var(--space-6)' }}>
+                Academic resources are usually shared for Free (Donate), but you can sell/rent them.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-                <div className="form-group">
-                  <label className="form-label">Category *</label>
-                  <select 
-                    className="form-select" 
-                    value={form.category} 
-                    onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                  >
-                    <option value="">Select Category</option>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Listing Type</label>
-                  <select 
-                    className="form-select" 
-                    value={form.listingType} 
-                    onChange={e => setForm(p => ({ ...p, listingType: e.target.value }))}
-                  >
-                    {LISTING_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Listing Type</label>
+                <select 
+                  className="form-select" 
+                  value={form.listingType} 
+                  onChange={e => setForm(p => ({ ...p, listingType: e.target.value }))}
+                  style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  {LISTING_TYPES.map(t => <option key={t} value={t}>{t} Item</option>)}
+                </select>
               </div>
 
               {(form.listingType === 'Sell' || form.listingType === 'Rent') ? (
@@ -345,88 +594,134 @@ function CreateListingContent() {
                   <input 
                     className="form-input" 
                     type="number" 
-                    placeholder="e.g. 250" 
+                    placeholder="e.g. 150" 
                     value={form.price} 
-                    onChange={e => setForm(p => ({ ...p, price: e.target.value }))} 
+                    onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
+                    style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                   />
-                  <p style={{ color: 'var(--text-tertiary)', fontSize: '10px', marginTop: '4px' }}>
-                    {form.listingType === 'Rent' ? 'Set the rent price per week/semester.' : 'Set your direct sell price.'}
-                  </p>
                 </div>
               ) : (
-                <div className="form-group animate-fadeInUp" style={{ padding: 'var(--space-4)', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-md)' }}>
-                  <p style={{ color: 'var(--accent-success)', fontSize: 'var(--fs-sm)', margin: 0, fontWeight: 'semibold' }}>
-                    🌱 This item is marked as <strong>{form.listingType}</strong>. It will be listed as Free/Exchange to help other students!
+                <div className="form-group animate-fadeInUp" style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.08)', border: '1px dashed rgba(16, 185, 129, 0.3)', borderRadius: '12px' }}>
+                  <p style={{ color: '#34d399', fontSize: '13px', margin: 0, fontWeight: '500' }}>
+                    🌱 Marked as <strong>{form.listingType}</strong>. Listed as Free to assist campus students!
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 4: Review & Publish */}
+          {/* STEP 4: Review and Publish */}
           {step === 4 && (
             <div>
-              <h3 style={{ fontSize: 'var(--fs-base)', fontWeight: 'bold', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Eye size={18} style={{ color: 'var(--accent-primary)' }} /> Review Your Listing
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Eye size={18} style={{ color: 'var(--accent-primary)' }} /> Review & Publish
               </h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-xs)', marginBottom: 'var(--space-6)' }}>
-                Verify details before publishing to the campus feed.
-              </p>
 
-              {/* Review summary cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
                 
-                {/* Photo summary */}
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                {/* Visual Overview */}
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '16px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
                   {preview ? (
-                    <img src={preview} alt="Preview" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                    <img src={preview} alt="Thumbnail" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px' }} />
                   ) : (
-                    <div style={{ width: '60px', height: '60px', background: 'var(--bg-tertiary)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>📦</div>
+                    <div style={{ width: '64px', height: '64px', background: '#1e293b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+                      {form.category === 'Notes' ? '📝' : 
+                       form.category === 'Assignments' ? '📋' : 
+                       form.category === 'Study Materials' ? '📁' : '📦'}
+                    </div>
                   )}
                   <div>
-                    <h4 style={{ margin: 0, fontSize: 'var(--fs-sm)', fontWeight: 'bold' }}>{form.title}</h4>
-                    <p style={{ margin: 0, fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>{form.category} • {form.condition} condition</p>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{form.title}</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
+                      Category: {form.category} • Condition: {isAcademicCategory() ? 'Digital File' : form.condition}
+                    </p>
                   </div>
                 </div>
 
-                {/* Details list */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: 'var(--fs-sm)', background: 'rgba(255,255,255,0.01)', padding: '16px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                {/* Specific details card */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '13px', background: 'rgba(255,255,255,0.01)', padding: '16px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
                   <div>
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: '10px', uppercase: 'true', display: 'block' }}>LISTING TYPE</span>
+                    <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Listing Type</span>
                     <strong>{form.listingType}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: '10px', uppercase: 'true', display: 'block' }}>PRICE</span>
+                    <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Price</span>
                     <strong>{(form.listingType === 'Donate' || form.listingType === 'Exchange') ? 'Free' : `₹${form.price || 0}`}</strong>
                   </div>
-                  <div>
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: '10px', uppercase: 'true', display: 'block' }}>LOCATION</span>
-                    <strong>{form.location}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: '10px', uppercase: 'true', display: 'block' }}>PUBLISHER</span>
-                    <strong>{userData?.displayName || 'Anonymous'}</strong>
-                  </div>
+                  
+                  {isAcademicCategory() ? (
+                    <>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Subject</span>
+                        <strong>{form.subjectName}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Semester</span>
+                        <strong>Semester {form.semester}</strong>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Pickup Location</span>
+                        <strong>{form.location}</strong>
+                      </div>
+                      {form.category === 'Books' && (
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Author</span>
+                          <strong>{form.author}</strong>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {form.category === 'Notes' && (
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Department</span>
+                      <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{form.department}</strong>
+                    </div>
+                  )}
+                  {form.category === 'Assignments' && (
+                    <>
+                      <div>
+                        <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Assignment Type</span>
+                        <strong>{form.assignmentType}</strong>
+                      </div>
+                      {form.facultyName && (
+                        <div>
+                          <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Faculty</span>
+                          <strong>{form.facultyName}</strong>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {form.category === 'Study Materials' && (
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Subcategory</span>
+                      <strong>{form.subcategory}</strong>
+                    </div>
+                  )}
                 </div>
 
-                {/* Description summary */}
-                <div style={{ background: 'rgba(255,255,255,0.01)', padding: '12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: 'var(--fs-sm)' }}>
-                  <span style={{ color: 'var(--text-tertiary)', fontSize: '10px', uppercase: 'true', display: 'block', marginBottom: '4px' }}>DESCRIPTION</span>
-                  <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '12.5px' }}>{form.description || 'No description provided.'}</p>
-                </div>
-
+                {/* File Attachment confirmation */}
+                {pdfName && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(59, 130, 246, 0.05)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '13px' }}>
+                    <FileText size={16} style={{ color: 'var(--accent-primary)' }} />
+                    <span style={{ color: '#93c5fd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Attached PDF: {pdfName}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Navigation Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: 'var(--space-6)', marginTop: 'var(--space-6)' }}>
+          {/* Navigation Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 'var(--space-6)', marginTop: 'var(--space-6)' }}>
             {step > 1 ? (
-              <button onClick={prevStep} type="button" className="btn btn-secondary" style={{ gap: '6px' }}>
+              <button onClick={prevStep} type="button" className="btn btn-secondary" style={{ gap: '6px' }} disabled={loading}>
                 <ChevronLeft size={16} /> Back
               </button>
             ) : (
-              <div /> // Placeholder
+              <div />
             )}
 
             {step < 4 ? (
@@ -438,12 +733,10 @@ function CreateListingContent() {
                 onClick={handlePublish} 
                 type="button" 
                 className="btn btn-success" 
-                style={{ gap: '6px', background: 'var(--gradient-success)' }}
+                style={{ gap: '6px', background: 'var(--gradient-success)', color: 'white' }}
                 disabled={loading}
               >
-                {loading ? (
-                  <>Publishing...</>
-                ) : (
+                {loading ? 'Publishing...' : (
                   <>
                     <Check size={16} /> Publish Listing
                   </>

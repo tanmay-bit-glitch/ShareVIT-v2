@@ -9,12 +9,13 @@ import {
   Bell, ShoppingCart, Briefcase, Users, Trophy, 
   Sparkles, MessageSquare, User, LogOut, ChevronDown, Plus, Heart, 
   Star, Settings, Tag, Package, Flame, Clock, Award, 
-  HelpCircle, AlertCircle, ShieldCheck, ClipboardList, Home, PlusCircle, Search, X
+  HelpCircle, AlertCircle, ShieldCheck, ClipboardList, Home, PlusCircle, Search, X,
+  FileText, BookOpen, Laptop, FolderOpen
 } from 'lucide-react';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const CATEGORIES = ['All', 'Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
+const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
 
 export default function Navbar() {
   const { user, userData, signOut, isAuthenticated } = useAuth();
@@ -31,14 +32,12 @@ export default function Navbar() {
 
   // Link Definitions
   const marketplaceLinks = [
-    { href: '/marketplace', label: 'Browse Listings', icon: ShoppingCart, priority: true },
-    { href: '/marketplace/create', label: 'Create Listing', icon: Plus, priority: true },
-    { href: '/profile?tab=listings', label: 'My Listings', icon: Tag },
-    { href: '/profile?tab=wishlist', label: 'Wishlist', icon: Heart },
-    { href: '/profile?tab=activity', label: 'Transactions', icon: Briefcase },
-    { href: '/profile?tab=activity', label: 'Orders', icon: Package },
-    { href: '/profile?tab=reviews', label: 'Reviews', icon: Star },
-    { href: '/requests', label: 'Requests', icon: ClipboardList }
+    { href: '/marketplace/notes', label: 'Notes', icon: FileText },
+    { href: '/marketplace/assignments', label: 'Assignments', icon: ClipboardList },
+    { href: '/marketplace/books', label: 'Books', icon: BookOpen },
+    { href: '/marketplace/electronics', label: 'Electronics', icon: Laptop },
+    { href: '/marketplace/study-materials', label: 'Study Materials', icon: FolderOpen },
+    { href: '/marketplace/miscellaneous', label: 'Miscellaneous', icon: Package }
   ];
 
   const communityLinks = [
@@ -194,7 +193,7 @@ export default function Navbar() {
                   <Link 
                     key={link.label} 
                     href={link.href} 
-                    className={`nav-dropdown-item ${active ? 'active' : ''} ${link.priority ? 'priority' : ''}`}
+                    className={`nav-dropdown-item ${active ? 'active' : ''}`}
                     onClick={() => setOpenDropdown(null)}
                   >
                     <Icon size={16} />
@@ -469,50 +468,52 @@ export default function Navbar() {
               {activeBottomSheet === 'marketplace' && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                    {marketplaceLinks.slice(0, 4).map(link => {
-                      const Icon = link.icon;
-                      return (
-                        <Link 
-                          key={link.label} 
-                          href={link.href} 
-                          className="btn btn-ghost" 
-                          style={{ justifyContent: 'flex-start', padding: '10px', fontSize: '12px', gap: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }} 
-                          onClick={() => setActiveBottomSheet(null)}
-                        >
-                          <Icon size={14} style={{ color: 'var(--accent-primary)' }} /> {link.label}
-                        </Link>
-                      );
-                    })}
+                    <Link 
+                      href="/marketplace" 
+                      className="btn btn-ghost" 
+                      style={{ justifyContent: 'flex-start', padding: '10px', fontSize: '12px', gap: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }} 
+                      onClick={() => setActiveBottomSheet(null)}
+                    >
+                      <ShoppingCart size={14} style={{ color: 'var(--accent-primary)' }} /> Browse All
+                    </Link>
+                    <Link 
+                      href="/marketplace/create" 
+                      className="btn btn-ghost" 
+                      style={{ justifyContent: 'flex-start', padding: '10px', fontSize: '12px', gap: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }} 
+                      onClick={() => setActiveBottomSheet(null)}
+                    >
+                      <Plus size={14} style={{ color: 'var(--accent-primary)' }} /> Sell Item
+                    </Link>
                   </div>
                   
                   <div style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
                     Explore Categories
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                    {CATEGORIES.slice(1).map(catName => (
-                      <Link 
-                        key={catName} 
-                        href={`/marketplace?category=${encodeURIComponent(catName)}`} 
-                        className="btn btn-ghost" 
-                        style={{ 
-                          padding: '8px 4px', fontSize: '10px', flexDirection: 'column', height: 'auto', gap: '4px',
-                          border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.01)'
-                        }} 
-                        onClick={() => setActiveBottomSheet(null)}
-                      >
-                        <span style={{ fontSize: '18px' }}>
-                          {catName === 'Books' ? '📚' : 
-                           catName === 'Electronics' ? '💻' : 
-                           catName === 'Gadgets' ? '🔌' : 
-                           catName === 'Cycles' ? '🚲' : 
-                           catName === 'Hostel Essentials' ? '🧹' : 
-                           catName === 'Lab Equipment' ? '🧪' : 
-                           catName === 'Stationery' ? '✏️' : 
-                           catName === 'Notes' ? '📝' : '📦'}
-                        </span>
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>{catName}</span>
-                      </Link>
-                    ))}
+                    {CATEGORIES.slice(1).map(catName => {
+                      const pathName = catName.toLowerCase().replace(' ', '-');
+                      return (
+                        <Link 
+                          key={catName} 
+                          href={`/marketplace/${pathName}`} 
+                          className="btn btn-ghost" 
+                          style={{ 
+                            padding: '8px 4px', fontSize: '10px', flexDirection: 'column', height: 'auto', gap: '4px',
+                            border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.01)'
+                          }} 
+                          onClick={() => setActiveBottomSheet(null)}
+                        >
+                          <span style={{ fontSize: '18px' }}>
+                            {catName === 'Notes' ? '📝' : 
+                             catName === 'Assignments' ? '📄' : 
+                             catName === 'Books' ? '📚' : 
+                             catName === 'Electronics' ? '💻' : 
+                             catName === 'Study Materials' ? '📁' : '📦'}
+                          </span>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>{catName}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </>
               )}

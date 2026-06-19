@@ -14,7 +14,7 @@ import {
   RotateCcw, Sparkles, AlertCircle, ShoppingCart, Plus 
 } from 'lucide-react';
 
-const CATEGORIES = ['All', 'Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
+const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
 const LISTING_TYPES = ['All Types', 'Sell', 'Rent', 'Donate', 'Exchange'];
 const CONDITIONS = ['All', 'New', 'Like New', 'Good', 'Fair', 'Poor'];
 const LOCATIONS = ['All', 'Hostel', 'Campus', 'Outside Campus'];

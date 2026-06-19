@@ -13,10 +13,10 @@ import { addToCart } from '@/lib/cart';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { 
   Heart, Share2, AlertTriangle, MessageSquare, Mail, ShoppingCart, 
-  ShieldCheck, Eye, Calendar, User, ChevronLeft, Star, Award, X
+  ShieldCheck, Eye, Calendar, User, ChevronLeft, Star, Award, X, Download
 } from 'lucide-react';
 
-const CATEGORIES = ['All', 'Books', 'Electronics', 'Gadgets', 'Cycles', 'Hostel Essentials', 'Lab Equipment', 'Stationery', 'Notes', 'Other'];
+const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
 
 export default function MarketplaceDetailPage() {
   return (
@@ -129,6 +129,22 @@ function MarketplaceDetail() {
       toast.error(res.message || 'Failed to add to cart.');
     }
     setAddingToCart(false);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!item?.pdfUrl) return;
+    try {
+      const docRef = doc(db, 'listings', id);
+      await updateDoc(docRef, {
+        downloads: increment(1)
+      });
+      setItem(prev => ({ ...prev, downloads: (prev.downloads || 0) + 1 }));
+      toast.success('Download started!');
+      window.open(item.pdfUrl, '_blank');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update download activity.');
+    }
   };
 
   const toggleSave = async () => {
@@ -331,6 +347,41 @@ function MarketplaceDetail() {
                 {item.title}
               </h1>
 
+              {/* Dynamic Academic Details */}
+              {item.pdfUrl && (
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', margin: '12px 0 20px', fontSize: '13.5px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {item.category === 'Notes' && (
+                    <>
+                      <div>Subject: <strong style={{ color: '#cbd5e1' }}>{item.subjectName}</strong></div>
+                      <div>Department: <strong style={{ color: '#cbd5e1' }}>{item.department}</strong></div>
+                      <div>Semester: <strong style={{ color: '#cbd5e1' }}>Semester {item.semester}</strong></div>
+                    </>
+                  )}
+                  {item.category === 'Assignments' && (
+                    <>
+                      <div>Subject: <strong style={{ color: '#cbd5e1' }}>{item.subjectName}</strong></div>
+                      <div>Semester: <strong style={{ color: '#cbd5e1' }}>Semester {item.semester}</strong></div>
+                      <div>Type: <span className="badge" style={{ fontSize: '10px' }}>{item.assignmentType}</span></div>
+                      {item.facultyName && <div>Faculty: <strong style={{ color: '#cbd5e1' }}>{item.facultyName}</strong></div>}
+                    </>
+                  )}
+                  {item.category === 'Study Materials' && (
+                    <>
+                      <div>Subject: <strong style={{ color: '#cbd5e1' }}>{item.subjectName}</strong></div>
+                      <div>Semester: <strong style={{ color: '#cbd5e1' }}>Semester {item.semester}</strong></div>
+                      <div>Subcategory: <span className="badge badge-warning" style={{ fontSize: '10px' }}>{item.subcategory}</span></div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Book Author display */}
+              {item.category === 'Books' && item.author && (
+                <div style={{ margin: '8px 0 16px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                  Author: <strong style={{ color: '#fff' }}>{item.author}</strong>
+                </div>
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-4)' }}>
                 {item.price > 0 ? (
                   <span style={{ fontSize: '2.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>₹{item.price}</span>
@@ -344,10 +395,15 @@ function MarketplaceDetail() {
               </div>
 
               {/* Engagement Stats */}
-              <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-6)' }}>
+              <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Eye size={16} /> {item.views || 1} views
                 </span>
+                {item.pdfUrl && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 'bold' }}>
+                    <Download size={16} /> {item.downloads || 0} downloads
+                  </span>
+                )}
                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Heart size={16} style={{ color: isSaved ? 'var(--accent-danger)' : 'inherit' }} /> {savesCount} saved
                 </span>
@@ -360,14 +416,24 @@ function MarketplaceDetail() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {item.sellerId !== user?.uid ? (
                   <>
-                    <button 
-                      onClick={handleAddToCart} 
-                      disabled={addingToCart}
-                      className="btn btn-primary btn-full btn-lg" 
-                      style={{ gap: '8px' }}
-                    >
-                      <ShoppingCart size={18} /> {addingToCart ? 'Adding...' : 'Add to Cart'}
-                    </button>
+                    {item.pdfUrl ? (
+                      <button 
+                        onClick={handleDownloadPDF} 
+                        className="btn btn-primary btn-full btn-lg" 
+                        style={{ gap: '8px', background: 'var(--gradient-primary)' }}
+                      >
+                        <Download size={18} /> Download PDF File
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={handleAddToCart} 
+                        disabled={addingToCart}
+                        className="btn btn-primary btn-full btn-lg" 
+                        style={{ gap: '8px' }}
+                      >
+                        <ShoppingCart size={18} /> {addingToCart ? 'Adding...' : 'Add to Cart'}
+                      </button>
+                    )}
                     
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <button onClick={handleContactSeller} className="btn btn-secondary" style={{ gap: '6px' }}>
