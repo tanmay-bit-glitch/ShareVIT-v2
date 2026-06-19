@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { uploadDocument } from '@/lib/cloudinary';
+import { uploadDocument, validateDocument } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -28,6 +28,17 @@ function UploadNotesContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.subject || !file) return toast.error('Title, subject and file are required.');
+
+    try {
+      validateDocument(file);
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (ext !== 'pdf') {
+        return toast.error('Invalid document format');
+      }
+    } catch (err) {
+      return toast.error(err.message || 'Invalid document format');
+    }
+
     setLoading(true);
     try {
       const fileUrl = await uploadDocument(file);
@@ -77,8 +88,8 @@ function UploadNotesContent() {
         <div className="form-group"><label className="form-label">Description</label><textarea className="form-textarea" placeholder="Brief description..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} /></div>
         <div className="form-group"><label className="form-label">File *</label>
           <div className="upload-area" onClick={() => document.getElementById('note-file').click()}>
-            {file ? <p>📎 {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</p> : <><p style={{ fontSize: '2rem' }}>📁</p><p>Click to upload (PDF, DOC, PPT, etc.)</p></>}
-            <input id="note-file" type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.zip" />
+            {file ? <p>📎 {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</p> : <><p style={{ fontSize: '2rem' }}>📁</p><p>Click to upload (PDF only)</p></>}
+            <input id="note-file" type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} accept=".pdf,application/pdf" />
           </div>
         </div>
         <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>{loading ? <><span className="spinner" /> Uploading...</> : 'Upload Notes'}</button>

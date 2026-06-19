@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { uploadDocument } from '@/lib/cloudinary';
+import { uploadDocument, validateDocument } from '@/lib/cloudinary';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -24,6 +24,17 @@ function UploadContent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !file) return toast.error('Title and file are required.');
+
+    try {
+      validateDocument(file);
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['pdf', 'doc', 'docx'].includes(ext)) {
+        return toast.error('Invalid document format');
+      }
+    } catch (err) {
+      return toast.error(err.message || 'Invalid document format');
+    }
+
     setLoading(true);
     try {
       const fileUrl = await uploadDocument(file);
@@ -55,8 +66,8 @@ function UploadContent() {
         <div className="form-group"><label className="form-label">Description</label><textarea className="form-textarea" placeholder="Brief description..." value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} /></div>
         <div className="form-group"><label className="form-label">File *</label>
           <div className="upload-area" onClick={() => document.getElementById('assign-file').click()}>
-            {file ? <p>📎 {file.name}</p> : <><p style={{ fontSize: '2rem' }}>📁</p><p>Click to upload</p></>}
-            <input id="assign-file" type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} />
+            {file ? <p>📎 {file.name}</p> : <><p style={{ fontSize: '2rem' }}>📁</p><p>Click to upload (PDF, DOC, DOCX)</p></>}
+            <input id="assign-file" type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0])} accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
           </div>
         </div>
         <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>{loading ? <><span className="spinner" /> Uploading...</> : 'Upload'}</button>

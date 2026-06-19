@@ -55,15 +55,42 @@ export const uploadFile = async (file, resourceType = 'auto', onProgress) => {
 };
 
 /**
- * Validates and uploads an image (JPG, JPEG, PNG, WEBP)
+ * Validates an image file type
  */
-export const uploadImage = async (file, onProgress) => {
-  const ext = file.name.split('.').pop().toLowerCase();
+export const validateImage = (file) => {
+  if (!file) {
+    throw new Error('No file selected');
+  }
+  const ext = file.name?.split('.').pop().toLowerCase();
   const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
   
   if (!allowedExtensions.includes(ext)) {
-    throw new Error('Invalid image type. Please select a JPG, JPEG, PNG, or WEBP image file.');
+    throw new Error('Invalid image format');
   }
+  return true;
+};
+
+/**
+ * Validates a document file type
+ */
+export const validateDocument = (file) => {
+  if (!file) {
+    throw new Error('No file selected');
+  }
+  const ext = file.name?.split('.').pop().toLowerCase();
+  const allowedExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
+  
+  if (!allowedExtensions.includes(ext)) {
+    throw new Error('Invalid document format');
+  }
+  return true;
+};
+
+/**
+ * Validates and uploads an image (JPG, JPEG, PNG, WEBP)
+ */
+export const uploadImage = async (file, onProgress) => {
+  validateImage(file);
   
   if (file.size > 10 * 1024 * 1024) {
     throw new Error('Image size exceeds the 10MB limit.');
@@ -77,12 +104,7 @@ export const uploadImage = async (file, onProgress) => {
  * Validates and uploads a document file (PDF, DOC, DOCX, PPT, PPTX) to raw/upload
  */
 export const uploadDocument = async (file, onProgress) => {
-  const ext = file.name.split('.').pop().toLowerCase();
-  const allowedExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
-  
-  if (!allowedExtensions.includes(ext)) {
-    throw new Error('Invalid document type. Only PDF, DOC, DOCX, PPT, and PPTX documents are allowed.');
-  }
+  validateDocument(file);
 
   if (file.size > 25 * 1024 * 1024) {
     throw new Error('Document size exceeds the 25MB limit.');

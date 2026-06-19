@@ -135,12 +135,12 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
     }
 
     // 2. Semester
-    if (categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials') {
+    if (categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials' || categoryName === 'PYQs') {
       if (semesterFilter !== 'All' && String(item.semester) !== semesterFilter) return false;
     }
 
     // 3. Department
-    if (categoryName === 'Notes') {
+    if (categoryName === 'Notes' || categoryName === 'PYQs') {
       if (deptFilter !== 'All' && item.department !== deptFilter) return false;
     }
 
@@ -155,12 +155,12 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
     }
 
     // 6. Condition
-    if (categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Miscellaneous') {
+    if (categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Marketplace Items' || categoryName === 'Miscellaneous') {
       if (conditionFilter !== 'All' && item.condition !== conditionFilter) return false;
     }
 
     // 7. Listing Type
-    if (categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Miscellaneous') {
+    if (categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Marketplace Items' || categoryName === 'Miscellaneous') {
       if (listingTypeFilter !== 'All' && item.listingType !== listingTypeFilter) return false;
     }
 
@@ -252,10 +252,10 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
                 }}
               >
                 <option value="newest">Sort: Newest</option>
-                {(categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials') && (
+                {(categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials' || categoryName === 'PYQs') && (
                   <option value="downloads">Most Downloaded</option>
                 )}
-                {(categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Miscellaneous') && (
+                {(categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Marketplace Items' || categoryName === 'Miscellaneous') && (
                   <>
                     <option value="priceAsc">Price: Low to High</option>
                     <option value="priceDesc">Price: High to Low</option>
@@ -292,7 +292,7 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
               </div>
 
               {/* Dynamic Categories Filters */}
-              {(categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials') && (
+              {(categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials' || categoryName === 'PYQs') && (
                 <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="form-label" style={{ fontSize: '12px', color: '#94a3b8' }}>Semester</label>
                   <select className="form-select" value={semesterFilter} onChange={e => setSemesterFilter(e.target.value)} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -304,7 +304,7 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
                 </div>
               )}
 
-              {categoryName === 'Notes' && (
+              {(categoryName === 'Notes' || categoryName === 'PYQs') && (
                 <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="form-label" style={{ fontSize: '12px', color: '#94a3b8' }}>Department</label>
                   <select className="form-select" value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -340,7 +340,7 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
                 </div>
               )}
 
-              {(categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Miscellaneous') && (
+              {(categoryName === 'Books' || categoryName === 'Electronics' || categoryName === 'Marketplace Items' || categoryName === 'Miscellaneous') && (
                 <>
                   <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label className="form-label" style={{ fontSize: '12px', color: '#94a3b8' }}>Condition</label>
@@ -384,11 +384,11 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
               <div className="grid grid-3 stagger-children">
                 {sorted.map(item => {
                   const isSaved = userData?.wishlist?.includes(item.id) || false;
-                  const isAcademic = categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials';
+                  const isAcademic = categoryName === 'Notes' || categoryName === 'Assignments' || categoryName === 'Study Materials' || categoryName === 'PYQs';
                   const dateStr = item.createdAt?.seconds 
                     ? new Date(item.createdAt.seconds * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
                     : 'Recently';
-
+ 
                   return (
                     <div 
                       key={item.id} 
@@ -429,7 +429,7 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
                             />
                           ) : (
                             <div style={{ fontSize: '4.5rem' }}>
-                              {categoryName === 'Notes' ? '📝' : 
+                              {(categoryName === 'Notes' || categoryName === 'PYQs') ? '📝' : 
                                categoryName === 'Assignments' ? '📋' : 
                                categoryName === 'Study Materials' ? '📁' : '📦'}
                             </div>
@@ -468,7 +468,7 @@ export default function CategoryPage({ categoryName, categoryEmoji, categoryDesc
                         
                         {/* Subheader descriptions */}
                         <div style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px', flex: 1 }}>
-                          {categoryName === 'Notes' && (
+                          {(categoryName === 'Notes' || categoryName === 'PYQs') && (
                             <>
                               <div>Subject: <strong style={{ color: '#cbd5e1' }}>{item.subjectName}</strong></div>
                               <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Dept: {item.department}</div>

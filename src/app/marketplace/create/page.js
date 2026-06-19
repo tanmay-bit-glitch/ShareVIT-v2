@@ -10,12 +10,20 @@ import { useToast } from '@/context/ToastContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { notifyGroup } from '@/lib/notifications';
 import { ENGINEERING_BRANCHES } from '@/lib/constants';
-import { 
-  Upload, Check, ChevronRight, ChevronLeft, Image as ImageIcon, 
+import {
+  getDocumentAccept,
+  getDocumentLabel,
+  isDocumentCategory,
+  isImageCategory,
+  validateMarketplaceDocument,
+  validateMarketplaceImage,
+} from '@/lib/marketplaceUploads';
+import {
+  Check, ChevronRight, ChevronLeft, Image as ImageIcon, 
   FileText, DollarSign, Eye, FileUp, Sparkles
 } from 'lucide-react';
 
-const CATEGORIES = ['Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
+const CATEGORIES = ['Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'PYQs', 'Marketplace Items', 'Miscellaneous'];
 const LISTING_TYPES = ['Sell', 'Rent', 'Donate', 'Exchange'];
 const CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 const LOCATIONS = ['Hostel', 'Campus', 'Outside Campus'];
@@ -76,11 +84,11 @@ function CreateListingContent() {
     const qCategory = searchParams.get('category');
     if (qCategory && CATEGORIES.includes(qCategory)) {
       setForm(prev => {
-        const isAcademic = qCategory === 'Notes' || qCategory === 'Assignments' || qCategory === 'Study Materials';
+        const isDoc = isDocumentCategory(qCategory);
         return { 
           ...prev, 
           category: qCategory,
-          listingType: isAcademic ? 'Donate' : 'Sell'
+          listingType: isDoc ? 'Donate' : 'Sell'
         };
       });
     }
@@ -88,11 +96,11 @@ function CreateListingContent() {
 
   // Adjust defaults when category changes
   const handleCategoryChange = (val) => {
-    const isAcademic = val === 'Notes' || val === 'Assignments' || val === 'Study Materials';
+    const isDoc = isDocumentCategory(val);
     setForm(prev => ({
       ...prev,
       category: val,
-      listingType: isAcademic ? 'Donate' : 'Sell',
+      listingType: isDoc ? 'Donate' : 'Sell',
       price: ''
     }));
   };
@@ -100,44 +108,36 @@ function CreateListingContent() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-      if (!allowedTypes.includes(file.type)) {
-        return toast.error('Invalid image type. Please select a JPG, PNG, or WEBP image.');
+      try {
+        validateMarketplaceImage(file);
+        if (file.size > 10 * 1024 * 1024) {
+          return toast.error('Image size must be less than 10MB.');
+        }
+        setImage(file);
+        setPreview(URL.createObjectURL(file));
+        toast.success('Image loaded successfully!');
+      } catch (err) {
+        toast.error(err.message || 'Invalid image format');
       }
-      if (file.size > 10 * 1024 * 1024) {
-        return toast.error('Image size must be less than 10MB.');
-      }
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
-      toast.success('Image loaded successfully!');
     }
   };
 
   const handlePdfChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const ext = file.name.split('.').pop().toLowerCase();
-      
-      if (form.category === 'Notes' && ext !== 'pdf') {
-        return toast.error('Notes must be uploaded in PDF format.');
-      }
-      
-      const allowedDocExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
-      if (!allowedDocExtensions.includes(ext)) {
-        return toast.error('Invalid document format. Allowed formats: PDF, DOC, DOCX, PPT, PPTX');
-      }
+      try {
+        validateMarketplaceDocument(file, form.category);
 
-      if (file.size > 25 * 1024 * 1024) {
-        return toast.error('Document size must be less than 25MB.');
+        if (file.size > 25 * 1024 * 1024) {
+          return toast.error('Document size must be less than 25MB.');
+        }
+        setPdfFile(file);
+        setPdfName(file.name);
+        toast.success('Document loaded successfully!');
+      } catch (err) {
+        toast.error(err.message || 'Invalid document format');
       }
-      setPdfFile(file);
-      setPdfName(file.name);
-      toast.success('Document loaded successfully!');
     }
-  };
-
-  const isAcademicCategory = () => {
-    return form.category === 'Notes' || form.category === 'Assignments' || form.category === 'Study Materials';
   };
 
   const nextStep = () => {
@@ -145,10 +145,10 @@ function CreateListingContent() {
       if (!form.category) {
         return toast.error('Please select a category first.');
       }
-      if (isAcademicCategory() && !pdfFile) {
-        return toast.error('Please attach a PDF document for academic sharing.');
+      if (isDocumentCategory(form.category) && !pdfFile) {
+        return toast.error('Please attach a document.');
       }
-      if (!isAcademicCategory() && !image) {
+      if (isImageCategory(form.category) && !image) {
         return toast.error('Please upload at least one image of the product.');
       }
     }
@@ -158,7 +158,7 @@ function CreateListingContent() {
         return toast.error('Please enter a listing title.');
       }
       // Validate dynamic detail fields
-      if (form.category === 'Notes') {
+      if (form.category === 'Notes' || form.category === 'PYQs') {
         if (!form.subjectName.trim()) return toast.error('Subject Name is required.');
         if (!form.department) return toast.error('Please select the department.');
         if (!form.semester) return toast.error('Please select the semester.');
@@ -195,16 +195,29 @@ function CreateListingContent() {
     setLoading(true);
     try {
       let imageUrl = '';
-      if (image) {
-        imageUrl = await uploadImage(image, (progress) => {
-          setImageProgress(progress);
-        });
-      }
-
       let pdfUrl = '';
-      if (pdfFile) {
+
+      if (isDocumentCategory(form.category)) {
+        if (!pdfFile) {
+          throw new Error('Please attach a document.');
+        }
+
         pdfUrl = await uploadDocument(pdfFile, (progress) => {
           setPdfProgress(progress);
+        });
+
+        if (image) {
+          imageUrl = await uploadImage(image, (progress) => {
+            setImageProgress(progress);
+          });
+        }
+      } else {
+        if (!image) {
+          throw new Error('Please upload at least one image of the product.');
+        }
+
+        imageUrl = await uploadImage(image, (progress) => {
+          setImageProgress(progress);
         });
       }
 
@@ -214,12 +227,12 @@ function CreateListingContent() {
         category: form.category,
         listingType: form.listingType,
         price: (form.listingType === 'Donate' || form.listingType === 'Exchange') ? 0 : Number(form.price) || 0,
-        condition: isAcademicCategory() ? 'New' : form.condition,
+        condition: isDocumentCategory(form.category) ? 'New' : form.condition,
         location: form.location,
         // Category specific details
-        subjectName: isAcademicCategory() ? form.subjectName : '',
-        department: form.category === 'Notes' ? form.department : '',
-        semester: isAcademicCategory() ? form.semester : '',
+        subjectName: isDocumentCategory(form.category) ? form.subjectName : '',
+        department: (form.category === 'Notes' || form.category === 'PYQs') ? form.department : '',
+        semester: isDocumentCategory(form.category) ? form.semester : '',
         facultyName: form.category === 'Assignments' ? form.facultyName : '',
         assignmentType: form.category === 'Assignments' ? form.assignmentType : '',
         subcategory: form.category === 'Study Materials' ? form.subcategory : '',
@@ -338,9 +351,11 @@ function CreateListingContent() {
                 <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   
                   {/* Academic Document Slot */}
-                  {isAcademicCategory() && (
+                  {isDocumentCategory(form.category) && (
                     <div className="form-group">
-                      <label className="form-label">Academic Document (PDF{form.category !== 'Notes' ? ', DOC, DOCX, PPT, PPTX' : ''}) *</label>
+                      <label className="form-label">
+                        Academic Document ({getDocumentLabel(form.category)}) *
+                      </label>
                       <div 
                         onClick={() => document.getElementById('listing-pdf').click()}
                         style={{ 
@@ -363,18 +378,18 @@ function CreateListingContent() {
                             <p style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff', margin: 0 }}>{pdfName}</p>
                             <p style={{ fontSize: '11px', color: 'var(--accent-success)', margin: '4px 0 0' }}>Click to replace file</p>
                           </div>
-                        ) : (
-                          <>
-                            <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select File</p>
-                            <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
-                              {form.category === 'Notes' ? 'PDF' : 'PDF, DOC, DOCX, PPT, PPTX'} up to 25MB
-                            </p>
-                          </>
-                        )}
+                          ) : (
+                            <>
+                              <p style={{ fontWeight: 'bold', fontSize: '13px', margin: 0 }}>Select File</p>
+                              <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                              {getDocumentLabel(form.category)} up to 25MB
+                              </p>
+                            </>
+                          )}
                         <input 
                           id="listing-pdf" 
                           type="file" 
-                          accept={form.category === 'Notes' ? 'application/pdf' : '.pdf,.doc,.docx,.ppt,.pptx'} 
+                          accept={getDocumentAccept(form.category)} 
                           style={{ display: 'none' }} 
                           onChange={handlePdfChange} 
                         />
@@ -385,7 +400,7 @@ function CreateListingContent() {
                   {/* Image slot (Optional for Academic, Required for Physical goods) */}
                   <div className="form-group">
                     <label className="form-label">
-                      {isAcademicCategory() ? 'Thumbnail Preview Image (Optional)' : 'Item Image *'}
+                      {isDocumentCategory(form.category) ? 'Thumbnail Preview Image (Optional)' : 'Item Image *'}
                     </label>
                     <div 
                       onClick={() => document.getElementById('listing-image').click()}
@@ -435,6 +450,7 @@ function CreateListingContent() {
               <div className="form-group">
                 <label className="form-label">
                   {form.category === 'Notes' ? 'Notes Title *' :
+                   form.category === 'PYQs' ? 'PYQ Title *' :
                    form.category === 'Assignments' ? 'Assignment Title *' :
                    form.category === 'Books' ? 'Book Title *' :
                    form.category === 'Electronics' ? 'Product Name *' :
@@ -448,11 +464,11 @@ function CreateListingContent() {
                   style={{ background: '#0b0f19', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
               </div>
-
+ 
               {/* DYNAMIC METADATA INPUTS */}
               
-              {/* Category: NOTES */}
-              {form.category === 'Notes' && (
+              {/* Category: NOTES / PYQs */}
+              {(form.category === 'Notes' || form.category === 'PYQs') && (
                 <div className="animate-fadeInUp" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <div className="form-group">
                     <label className="form-label">Subject Name *</label>
@@ -649,7 +665,7 @@ function CreateListingContent() {
                     <img src={preview} alt="Thumbnail" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px' }} />
                   ) : (
                     <div style={{ width: '64px', height: '64px', background: '#1e293b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
-                      {form.category === 'Notes' ? '📝' : 
+                      {(form.category === 'Notes' || form.category === 'PYQs') ? '📝' : 
                        form.category === 'Assignments' ? '📋' : 
                        form.category === 'Study Materials' ? '📁' : '📦'}
                     </div>
@@ -657,11 +673,11 @@ function CreateListingContent() {
                   <div>
                     <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>{form.title}</h4>
                     <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
-                      Category: {form.category} • Condition: {isAcademicCategory() ? 'Digital File' : form.condition}
+                      Category: {form.category} • Condition: {isDocumentCategory(form.category) ? 'Digital File' : form.condition}
                     </p>
                   </div>
                 </div>
-
+ 
                 {/* Specific details card */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '13px', background: 'rgba(255,255,255,0.01)', padding: '16px', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
                   <div>
@@ -673,7 +689,7 @@ function CreateListingContent() {
                     <strong>{(form.listingType === 'Donate' || form.listingType === 'Exchange') ? 'Free' : `₹${form.price || 0}`}</strong>
                   </div>
                   
-                  {isAcademicCategory() ? (
+                  {isDocumentCategory(form.category) ? (
                     <>
                       <div>
                         <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Subject</span>
@@ -698,8 +714,8 @@ function CreateListingContent() {
                       )}
                     </>
                   )}
-
-                  {form.category === 'Notes' && (
+ 
+                  {(form.category === 'Notes' || form.category === 'PYQs') && (
                     <div style={{ gridColumn: 'span 2' }}>
                       <span style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Department</span>
                       <strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{form.department}</strong>

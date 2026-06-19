@@ -16,7 +16,7 @@ import {
   ShieldCheck, Eye, Calendar, User, ChevronLeft, Star, Award, X, Download
 } from 'lucide-react';
 
-const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
+const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'PYQs', 'Marketplace Items', 'Miscellaneous'];
 
 export default function MarketplaceDetailPage() {
   return (
@@ -350,7 +350,7 @@ function MarketplaceDetail() {
               {/* Dynamic Academic Details */}
               {item.pdfUrl && (
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-color)', margin: '12px 0 20px', fontSize: '13.5px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {item.category === 'Notes' && (
+                  {(item.category === 'Notes' || item.category === 'PYQs') && (
                     <>
                       <div>Subject: <strong style={{ color: '#cbd5e1' }}>{item.subjectName}</strong></div>
                       <div>Department: <strong style={{ color: '#cbd5e1' }}>{item.department}</strong></div>

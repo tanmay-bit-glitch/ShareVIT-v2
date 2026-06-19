@@ -15,7 +15,7 @@ import {
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'Miscellaneous'];
+const CATEGORIES = ['All', 'Notes', 'Assignments', 'Books', 'Electronics', 'Study Materials', 'PYQs', 'Marketplace Items', 'Miscellaneous'];
 
 export default function Navbar() {
   const { user, userData, signOut, isAuthenticated } = useAuth();
@@ -37,6 +37,8 @@ export default function Navbar() {
     { href: '/marketplace/books', label: 'Books', icon: BookOpen },
     { href: '/marketplace/electronics', label: 'Electronics', icon: Laptop },
     { href: '/marketplace/study-materials', label: 'Study Materials', icon: FolderOpen },
+    { href: '/marketplace/pyqs', label: 'PYQs', icon: FileText },
+    { href: '/marketplace/marketplace-items', label: 'Marketplace Items', icon: Package },
     { href: '/marketplace/miscellaneous', label: 'Miscellaneous', icon: Package }
   ];
 
@@ -504,7 +506,7 @@ export default function Navbar() {
                           onClick={() => setActiveBottomSheet(null)}
                         >
                           <span style={{ fontSize: '18px' }}>
-                            {catName === 'Notes' ? '📝' : 
+                            {(catName === 'Notes' || catName === 'PYQs') ? '📝' : 
                              catName === 'Assignments' ? '📄' : 
                              catName === 'Books' ? '📚' : 
                              catName === 'Electronics' ? '💻' : 
