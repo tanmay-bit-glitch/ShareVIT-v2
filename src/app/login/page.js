@@ -39,7 +39,8 @@ export default function LoginPage() {
       toast.success('Welcome!');
       router.push('/');
     } catch (err) {
-      toast.error('Google sign-in failed.');
+      console.error('Google sign-in error:', err);
+      toast.error(`Google sign-in failed: ${err.code || err.message}`);
     }
   };
 

@@ -37,45 +37,28 @@ const Linkedin = (props) => (
 
 // --- DUMMY DATA FOR MARKETPLACE PORTFOLIO (V3) ---
 const INITIAL_DUMMY_DATA = {
-  trustScore: 98,
-  memberSince: "Oct 2024",
-  lastActive: "10 mins ago",
-  sellerRating: 4.9,
-  buyerRating: 4.8,
-  transactions: 28,
-  repeatCustomers: 4,
+  trustScore: 100,
+  memberSince: "June 2026",
+  lastActive: "Just now",
+  sellerRating: 0.0,
+  buyerRating: 0.0,
+  transactions: 0,
+  repeatCustomers: 0,
   analytics: {
-    posted: 18,
-    sold: 12,
-    rented: 4,
-    exchanged: 2,
-    views: 452,
-    saves: 38,
-    responseRate: 98,
-    responseTime: "15m"
+    posted: 0,
+    sold: 0,
+    rented: 0,
+    exchanged: 0,
+    views: 0,
+    saves: 0,
+    responseRate: 100,
+    responseTime: "N/A"
   },
-  listings: [
-    { id: 1, title: 'Scientific Calculator fx-991EX', price: '₹750', category: 'Calculators', condition: 'Like New', status: 'Available', image: 'https://images.unsplash.com/photo-1580521841315-99881fa4b7b3?auto=format&fit=crop&q=80&w=400', pinned: true },
-    { id: 2, title: 'Arduino Uno Ultimate Starter Kit', price: '₹120/wk', category: 'Engineering Tools', condition: 'Good', status: 'Rented', image: 'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?auto=format&fit=crop&q=80&w=400', pinned: true },
-    { id: 3, title: 'Engineering Mechanics Textbook', price: '₹200', category: 'Books', condition: 'Fair', status: 'Available', image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&q=80&w=400', pinned: false },
-    { id: 4, title: 'Lab Apron and Safety Goggles', price: '₹150', category: 'Hostel Essentials', condition: 'New', status: 'Sold', image: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&q=80&w=400', pinned: false }
-  ],
-  lookingFor: [
-    { id: 1, title: 'Hostel Study Table (Wood)', budget: '₹500 - ₹800', category: 'Hostel Essentials' },
-    { id: 2, title: 'ESP32 Development Board', budget: '₹200 - ₹300', category: 'Engineering Tools' }
-  ],
-  wishlist: [
-    { id: 201, title: 'Campus Cycle (Single Speed)', price: '₹2,500', category: 'Cycles', status: 'Available', image: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&q=80&w=400' }
-  ],
-  reviews: [
-    { id: 1, reviewer: 'Rohan Sharma', type: 'Buyer', rating: 5, comment: 'Quick response, item was in perfect condition. Recommend!' },
-    { id: 2, reviewer: 'Sneha Patel', type: 'Seller', rating: 5, comment: 'Very polite, prompt payment, smooth transaction.' }
-  ],
-  activity: [
-    { id: 1, action: "Listed a new item: Scientific Calculator fx-991EX", time: "2 hours ago" },
-    { id: 2, action: "Sold Lab Apron to Rohan Sharma", time: "1 day ago" },
-    { id: 3, action: "Received a 5-star review from Sneha Patel", time: "3 days ago" }
-  ]
+  listings: [],
+  lookingFor: [],
+  wishlist: [],
+  reviews: [],
+  activity: []
 };
 
 export default function ProfilePage() {
