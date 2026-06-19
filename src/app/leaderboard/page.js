@@ -141,9 +141,7 @@ function LeaderboardContent() {
             </h1>
             <p style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-1)' }}>Compete with peers by listing items, completing transactions, and maintaining streaks.</p>
           </div>
-          <span className="badge badge-warning" style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--fs-base)', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <Flame size={18} style={{ color: 'var(--accent-warning)' }} /> Season 1 Active
-          </span>
+
         </div>
 
         {/* Tab Filters */}
