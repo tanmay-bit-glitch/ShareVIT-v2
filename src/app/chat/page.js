@@ -43,6 +43,7 @@ function ChatContent() {
   const itemId = searchParams.get('itemId');
   const sellerIdParam = searchParams.get('sellerId');
   const sellerNameParam = searchParams.get('sellerName');
+  const chatIdParam = searchParams.get('chatId');
 
   const [room, setRoom] = useState(PUBLIC_ROOMS[0]);
   const [dmRooms, setDmRooms] = useState([]);
@@ -133,6 +134,26 @@ function ChatContent() {
     setupDm();
   }, [user, sellerIdParam, sellerNameParam, userData]);
 
+  // Handle routing directly to a chat room from a notification
+  useEffect(() => {
+    if (!chatIdParam || dmRooms.length === 0) return;
+    
+    // Check if it's a DM room
+    const targetDmRoom = dmRooms.find(r => r.id === chatIdParam);
+    if (targetDmRoom) {
+      setRoom(targetDmRoom);
+      setActiveTab('dms');
+      return;
+    }
+
+    // Check if it's a public room
+    const targetPublicRoom = PUBLIC_ROOMS.find(r => r.id === chatIdParam);
+    if (targetPublicRoom) {
+      setRoom(targetPublicRoom);
+      setActiveTab('server');
+    }
+  }, [chatIdParam, dmRooms]);
+
   // Fetch active item details for listing context
   useEffect(() => {
     if (!itemId) {
@@ -212,7 +233,7 @@ function ChatContent() {
           `New message from ${userData?.displayName || 'a student'}`,
           msgText || '📷 Sent an image',
           'Community',
-          { link: '/chat', chatId: room.id, type: 'direct_message' }
+          { link: `/chat?chatId=${room.id}`, chatId: room.id, type: 'direct_message' }
         );
       }
     } else {
