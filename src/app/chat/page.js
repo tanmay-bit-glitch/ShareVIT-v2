@@ -53,6 +53,7 @@ function ChatContent() {
   const [activeItem, setActiveItem] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [chatUploadProgress, setChatUploadProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState('server'); // 'server' | 'dms'
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -62,8 +63,7 @@ function ChatContent() {
     if (!user) return;
     const q = query(
       collection(db, 'direct_chats'),
-      where('participants', 'array-contains', user.uid),
-      orderBy('updatedAt', 'desc')
+      where('participants', 'array-contains', user.uid)
     );
     const unsub = onSnapshot(q, (snap) => {
       const fetchedDms = snap.docs.map(d => {
@@ -79,7 +79,15 @@ function ChatContent() {
           data
         };
       });
+      // Sort client-side to avoid requiring a composite index in Firestore
+      fetchedDms.sort((a, b) => {
+        const timeA = a.data.updatedAt?.toMillis ? a.data.updatedAt.toMillis() : 0;
+        const timeB = b.data.updatedAt?.toMillis ? b.data.updatedAt.toMillis() : 0;
+        return timeB - timeA;
+      });
       setDmRooms(fetchedDms);
+    }, (error) => {
+      console.error("Error fetching DMs:", error);
     });
     return () => unsub();
   }, [user]);
@@ -120,6 +128,7 @@ function ChatContent() {
         desc: 'Direct Message',
         data: { participants: [user.uid, sellerIdParam] }
       });
+      setActiveTab('dms');
     };
     setupDm();
   }, [user, sellerIdParam, sellerNameParam, userData]);
@@ -336,25 +345,116 @@ function ChatContent() {
           boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
           transition: 'transform 0.3s ease-in-out',
         }}>
-          {/* Sidebar Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MessagesSquare size={18} style={{ color: 'var(--accent-primary)' }} />
-              <span>ShareVIT Server</span>
-            </h3>
-            <button className="navbar-hamburger" onClick={() => setChannelsOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
-              <X size={20} />
-            </button>
+          {/* Sidebar Header with Tabs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessagesSquare size={18} style={{ color: 'var(--accent-primary)' }} />
+                <span>ShareVIT Chat</span>
+              </h3>
+              <button className="navbar-hamburger" onClick={() => setChannelsOpen(false)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Tabs */}
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', padding: '4px' }}>
+              <button 
+                onClick={() => setActiveTab('server')}
+                style={{ 
+                  flex: 1, 
+                  padding: '8px 0', 
+                  borderRadius: '8px', 
+                  border: 'none', 
+                  background: activeTab === 'server' ? '#6366f1' : 'transparent', 
+                  color: activeTab === 'server' ? '#fff' : '#94a3b8', 
+                  fontSize: '13px', 
+                  fontWeight: '600', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Server
+              </button>
+              <button 
+                onClick={() => setActiveTab('dms')}
+                style={{ 
+                  flex: 1, 
+                  padding: '8px 0', 
+                  borderRadius: '8px', 
+                  border: 'none', 
+                  background: activeTab === 'dms' ? '#6366f1' : 'transparent', 
+                  color: activeTab === 'dms' ? '#fff' : '#94a3b8', 
+                  fontSize: '13px', 
+                  fontWeight: '600', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                DMs
+              </button>
+            </div>
           </div>
           
           {/* Channels List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: 1, scrollbarWidth: 'none' }}>
             
             {/* Direct Messages Section */}
-            {dmRooms.length > 0 && (
+            {activeTab === 'dms' && (
               <>
-                <p style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '8px', marginBottom: '4px' }}>Direct Messages</p>
-                {dmRooms.map(r => {
+                {dmRooms.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+                    No direct messages yet.
+                  </div>
+                ) : (
+                  dmRooms.map(r => {
+                    const isActive = room.id === r.id;
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          setRoom(r);
+                          setChannelsOpen(false);
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          background: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                          color: isActive ? '#fff' : 'var(--text-secondary)',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '13.5px',
+                          outline: 'none',
+                          fontWeight: isActive ? '600' : '400',
+                          marginBottom: '4px'
+                        }}
+                      >
+                        <UserIcon size={16} style={{ color: isActive ? 'var(--accent-primary-hover)' : 'var(--text-tertiary)' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label}</span>
+                          {r.data?.lastMessage && (
+                            <span style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {r.data.lastMessage}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </>
+            )}
+
+            {/* Text Channels Section */}
+            {activeTab === 'server' && (
+              <>
+                <p style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '8px', marginBottom: '4px' }}>Text Channels</p>
+                {PUBLIC_ROOMS.map(r => {
                   const isActive = room.id === r.id;
                   return (
                     <button
@@ -377,58 +477,16 @@ function ChatContent() {
                         gap: '8px',
                         fontSize: '13.5px',
                         outline: 'none',
-                        fontWeight: isActive ? '600' : '400',
-                        marginBottom: '4px'
+                        fontWeight: isActive ? '600' : '400'
                       }}
                     >
-                      <UserIcon size={16} style={{ color: isActive ? 'var(--accent-primary-hover)' : 'var(--text-tertiary)' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label}</span>
-                        {r.data?.lastMessage && (
-                          <span style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {r.data.lastMessage}
-                          </span>
-                        )}
-                      </div>
+                      <Hash size={16} style={{ color: isActive ? 'var(--accent-primary-hover)' : 'var(--text-tertiary)' }} />
+                      <span>{r.label}</span>
                     </button>
                   );
                 })}
-                <div style={{ height: '12px' }} />
               </>
             )}
-
-            <p style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '8px', marginBottom: '4px' }}>Text Channels</p>
-            {PUBLIC_ROOMS.map(r => {
-              const isActive = room.id === r.id;
-              return (
-                <button
-                  key={r.id}
-                  onClick={() => {
-                    setRoom(r);
-                    setChannelsOpen(false);
-                  }}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
-                    color: isActive ? '#fff' : 'var(--text-secondary)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '13.5px',
-                    outline: 'none',
-                    fontWeight: isActive ? '600' : '400'
-                  }}
-                >
-                  <Hash size={16} style={{ color: isActive ? 'var(--accent-primary-hover)' : 'var(--text-tertiary)' }} />
-                  <span>{r.label}</span>
-                </button>
-              );
-            })}
           </div>
         </div>
 
